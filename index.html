@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TikTok 爆款短视频生成脑图工具</title>
+    <link rel="stylesheet" href="styles.css?v=20260624r" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="mindmap" aria-label="生成流程">
+        <div class="brand-block">
+          <span class="brand-mark">V</span>
+          <div>
+            <p class="eyebrow">Mind Map Workflow</p>
+            <h1>TikTok 短视频工具</h1>
+          </div>
+        </div>
+
+        <div class="map-tree">
+          <button class="map-root" type="button" data-step="1">
+            <span class="node-title">产品资料</span>
+            <span class="node-sub">填好资料，先拿到顺口脚本</span>
+          </button>
+
+          <div class="map-branches" aria-label="四个步骤">
+            <button class="map-node active" type="button" data-step="1">
+              <span class="node-index">1</span>
+              <span>
+                <span class="node-title">脚本资料表</span>
+                <span class="node-sub">产品、受众、卖点、CTA</span>
+              </span>
+            </button>
+            <button class="map-node" type="button" data-step="2">
+              <span class="node-index">2</span>
+              <span>
+                <span class="node-title">图片与口播</span>
+                <span class="node-sub">4-5 张图 prompt JSON</span>
+              </span>
+            </button>
+            <button class="map-node" type="button" data-step="3">
+              <span class="node-index">3</span>
+              <span>
+                <span class="node-title">影片 JSON</span>
+                <span class="node-sub">分镜、镜头、字幕、声音</span>
+              </span>
+            </button>
+            <button class="map-node" type="button" data-step="4">
+              <span class="node-index">4</span>
+              <span>
+                <span class="node-title">合成最终影片</span>
+                <span class="node-sub">上传短片，浏览器合并</span>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="summary-panel">
+          <p class="summary-label">当前方案</p>
+          <p id="summaryProduct">还没有产品名称</p>
+          <p id="summaryAudience">目标客户会显示在这里</p>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Malaysia Chinese Script Builder</p>
+            <h2 id="stepTitle">脚本资料表</h2>
+          </div>
+          <div class="top-actions">
+            <button class="ghost-btn" type="button" id="loadDemoBtn" title="载入范例">范例</button>
+            <button class="ghost-btn" type="button" id="clearBtn" title="清空本地资料">清空</button>
+            <button class="primary-btn" type="button" id="generateAllBtn">一键生成</button>
+          </div>
+        </header>
+
+        <section class="step-panel active" id="step1" data-panel="1">
+          <div class="panel-grid two-col">
+            <form class="tool-panel" id="briefForm">
+              <div class="section-heading">
+                <p class="eyebrow">Step 1</p>
+                <h3>TikTok 爆款短视频脚本资料表</h3>
+              </div>
+
+              <label>
+                <span>Product / Service</span>
+                <input id="product" name="product" type="text" placeholder="例如：强力排水管清洁粉" />
+              </label>
+
+              <label>
+                <span>Industry / Niche</span>
+                <input id="industry" name="industry" type="text" placeholder="例如：家居清洁、宠物用品、园艺肥料" />
+              </label>
+
+              <label>
+                <span>Target Audience</span>
+                <input id="audience" name="audience" type="text" placeholder="例如：家庭主妇、猫主人、菜园种植者" />
+              </label>
+
+              <label>
+                <span>Script Language</span>
+                <select id="language" name="language">
+                  <option value="马来西亚华语（口语化、自然、Voice-safe、不讲“令吉”，直接讲“块”）">马来西亚华语</option>
+                  <option value="中文普通话（口语化、自然、Voice-safe）">中文普通话</option>
+                  <option value="English (natural Malaysian TikTok voiceover, casual, voice-safe, no exaggerated guarantee claims)">English</option>
+                  <option value="Bahasa Melayu Malaysia (natural casual TikTok voiceover, voice-safe, no exaggerated guarantee claims)">Bahasa Melayu</option>
+                </select>
+              </label>
+
+              <div class="field-row">
+                <label>
+                  <span>Persona / Character</span>
+                  <select id="personaPreset" name="personaPreset">
+                    <option value="">自定义 / 手写</option>
+                    <option value="老板亲自介绍">老板亲自介绍</option>
+                    <option value="农夫真实分享">农夫真实分享</option>
+                    <option value="家庭主妇实测">家庭主妇实测</option>
+                    <option value="兽医专业建议">兽医专业建议</option>
+                    <option value="专业顾问讲解">专业顾问讲解</option>
+                    <option value="用户见证">用户见证</option>
+                    <option value="店员示范">店员示范</option>
+                  </select>
+                </label>
+                <label>
+                  <span>自定义人物描述</span>
+                  <input id="persona" name="persona" type="text" placeholder="例如：40 岁本地老板，讲话直接，有亲切感" />
+                </label>
+              </div>
+
+              <div class="voice-panel">
+                <div class="field-row">
+                  <label>
+                    <span>人物来源</span>
+                    <select id="characterMode" name="characterMode">
+                      <option value="persona">预设 / 手写人物</option>
+                      <option value="self_upload">上传自己做人设参考</option>
+                      <option value="no_person">无人出镜</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>人物参考图</span>
+                    <input id="characterReference" type="file" accept="image/*" />
+                  </label>
+                </div>
+                <p class="helper-text" id="characterStatus">默认会用上面的人物描述。选择上传自己时，JSON 会引用这张人物参考图的文件名；选择无人出镜时，图片和影片 prompt 会要求不要出现人物。</p>
+              </div>
+
+              <div class="voice-panel">
+                <div class="field-row">
+                  <label>
+                    <span>Voice / Sound</span>
+                    <select id="voiceMode" name="voiceMode">
+                      <option value="ai">普通 AI 口播</option>
+                      <option value="clone">使用 15 秒声音克隆</option>
+                      <option value="none">不要口播，只要字幕</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>15 秒声音样本</span>
+                    <input id="voiceSample" type="file" accept="audio/*,video/*" />
+                  </label>
+                </div>
+                <p class="helper-text" id="voiceStatus">如果要克隆声音，请上传约 15 秒清楚口播音频。JSON 会引用这个文件名。</p>
+              </div>
+
+              <div class="voice-panel">
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" id="generateAnglesBtn">自动生成 Hook / USP</button>
+                </div>
+                <p class="helper-text">根据产品、行业、目标客户和 Script Language 自动补 Hook、USP 1、USP 2、USP 3。</p>
+              </div>
+
+              <label>
+                <span>Hook / Introduction（3 秒吸引）</span>
+                <textarea id="hook" name="hook" rows="3" placeholder="例如：你家的排水管是不是又塞了？"></textarea>
+              </label>
+
+              <div class="field-row">
+                <label>
+                  <span>USP 1</span>
+                  <input id="usp1" name="usp1" type="text" placeholder="最强卖点" />
+                </label>
+                <label>
+                  <span>USP 2</span>
+                  <input id="usp2" name="usp2" type="text" placeholder="第二卖点" />
+                </label>
+              </div>
+
+              <label>
+                <span>USP 3</span>
+                <input id="usp3" name="usp3" type="text" placeholder="信任卖点，例如：真实用户回购、适合日常使用" />
+              </label>
+
+              <label>
+                <span>Offer / Promotion（可选）</span>
+                <input id="offer" name="offer" type="text" placeholder="例如：今天下单送试用装、买二更划算" />
+              </label>
+
+              <label>
+                <span>CTA</span>
+                <input id="cta" name="cta" type="text" placeholder="例如：点击下面黄色购物车了解更多" />
+              </label>
+
+              <div class="button-row">
+                <button class="primary-btn" type="button" id="generateScriptBtn">生成流畅脚本</button>
+                <button class="ghost-btn" type="button" data-next="2">下一步</button>
+              </div>
+            </form>
+
+            <div class="tool-panel output-panel">
+              <div class="section-heading compact">
+                <p class="eyebrow">Script Output</p>
+                <h3>口播脚本</h3>
+              </div>
+              <textarea id="scriptOutput" class="output-area" rows="18" placeholder="生成后的脚本会出现在这里，也可以直接编辑再继续生成图片和影片 JSON。"></textarea>
+              <div class="translator-panel">
+                <div class="field-row">
+                  <label>
+                    <span>翻译口播脚本</span>
+                    <select id="translationTarget">
+                      <option value="zh">中文</option>
+                      <option value="en">English</option>
+                      <option value="ms">Bahasa Melayu</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" id="translateScriptBtn">生成翻译版</button>
+                  <button class="ghost-btn" type="button" id="applyTranslatedScriptBtn">套用到口播脚本</button>
+                </div>
+                <textarea id="translatedScriptOutput" class="output-area" rows="10" placeholder="翻译版口播会出现在这里。"></textarea>
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" id="copyTranslatedScriptBtn">复制翻译版</button>
+                  <button class="ghost-btn" type="button" id="downloadTranslatedScriptBtn">下载翻译版</button>
+                </div>
+              </div>
+              <div class="button-row">
+                <button class="ghost-btn" type="button" id="copyScriptBtn">复制脚本</button>
+                <button class="ghost-btn" type="button" id="downloadScriptBtn">下载 TXT</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-panel" id="step2" data-panel="2">
+          <div class="panel-grid two-col">
+            <div class="tool-panel">
+              <div class="section-heading">
+                <p class="eyebrow">Step 2</p>
+                <h3>生成 4-5 张制作剧本影片的图</h3>
+              </div>
+              <div class="storyboard-grid" id="storyboardCards" aria-live="polite"></div>
+              <div class="button-row">
+                <button class="primary-btn" type="button" id="generateStoryBtn">生成图片 JSON</button>
+                <button class="ghost-btn" type="button" data-next="3">下一步</button>
+              </div>
+            </div>
+
+            <div class="tool-panel output-panel">
+              <div class="section-heading compact">
+                <p class="eyebrow">Image Prompt JSON</p>
+                <h3>一次生成 5 张独立图片</h3>
+              </div>
+              <textarea id="storyJsonOutput" class="output-area code-area" rows="26"></textarea>
+              <div class="button-row">
+                <button class="ghost-btn" type="button" id="copyStoryBtn">复制 JSON</button>
+                <button class="ghost-btn" type="button" id="downloadStoryBtn">下载 JSON</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-panel" id="step3" data-panel="3">
+          <div class="panel-grid two-col">
+            <div class="tool-panel">
+              <div class="section-heading">
+                <p class="eyebrow">Step 3</p>
+                <h3>生成影片 JSON</h3>
+              </div>
+              <div class="video-settings">
+                <div class="field-row">
+                  <label>
+                    <span>影片段数</span>
+                    <select id="videoClipCount">
+                      <option value="2">2 段（省 token）</option>
+                      <option value="3" selected>3 段（推荐）</option>
+                      <option value="4">4 段</option>
+                      <option value="5">5 段（最细）</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>每段最多秒数</span>
+                    <input id="videoMaxSeconds" type="number" min="5" max="15" step="1" value="15" />
+                  </label>
+                </div>
+                <p class="helper-text">Higgsfield 一次最多 15 秒。这里会把 5 个分镜合并成较少影片段，并在每个 JSON 写清楚网页要选几秒。</p>
+              </div>
+              <div class="json-preview" id="videoPlanPreview"></div>
+              <div class="button-row">
+                <button class="primary-btn" type="button" id="generateVideoJsonBtn">生成影片 JSON</button>
+                <button class="ghost-btn" type="button" data-next="4">下一步</button>
+              </div>
+            </div>
+
+            <div class="tool-panel output-panel">
+              <div class="section-heading compact">
+                <p class="eyebrow">Video JSON</p>
+                <h3>2-5 个单独 JSON（每段标明秒数）</h3>
+              </div>
+              <div class="single-json-list" id="singleVideoJsonList"></div>
+              <textarea id="videoJsonOutput" class="output-area code-area" rows="26"></textarea>
+              <div class="button-row">
+                <button class="ghost-btn" type="button" id="copyVideoJsonBtn">复制总览 JSON</button>
+                <button class="ghost-btn" type="button" id="downloadVideoJsonBtn">下载总览 JSON</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="step-panel" id="step4" data-panel="4">
+          <div class="panel-grid two-col">
+            <div class="tool-panel">
+              <div class="section-heading">
+                <p class="eyebrow">Step 4</p>
+                <h3>把几段短片合成最终影片</h3>
+              </div>
+
+              <div class="uploader">
+                <input id="clipInput" type="file" accept="video/*" multiple />
+                <label for="clipInput" class="upload-zone">
+                  <span class="upload-icon">+</span>
+                  <span>选择 4-5 段短片</span>
+                  <small>按选择顺序合成，输出 WebM</small>
+                </label>
+              </div>
+
+              <div class="clip-list" id="clipList">
+                <p class="empty-state">还没有选择短片。</p>
+              </div>
+
+              <div class="render-controls">
+                <label class="inline-control">
+                  <span>每段最多秒数</span>
+                  <input id="maxClipSeconds" type="number" min="2" max="20" step="1" value="5" />
+                </label>
+                <label class="check-control">
+                  <input id="captionToggle" type="checkbox" checked />
+                  <span>加上脚本字幕</span>
+                </label>
+              </div>
+
+              <div class="progress-shell" aria-live="polite">
+                <div class="progress-bar" id="renderProgress"></div>
+              </div>
+              <p class="status-line" id="renderStatus">准备好后点击合成。</p>
+
+              <div class="button-row">
+                <button class="primary-btn" type="button" id="renderVideoBtn" data-action="render-video">合成最终影片</button>
+                <button class="ghost-btn" type="button" id="renderSlidesBtn" data-action="render-slides">用分镜图卡生成样片</button>
+                <button class="ghost-btn" type="button" id="downloadMergeManifestBtn" data-action="merge-manifest">导出合成清单</button>
+              </div>
+            </div>
+
+            <div class="tool-panel output-panel">
+              <div class="section-heading compact">
+                <p class="eyebrow">Final Preview</p>
+                <h3>最终影片预览</h3>
+              </div>
+              <div class="phone-frame">
+                <canvas id="renderCanvas" width="720" height="1280"></canvas>
+                <video id="finalPreview" controls hidden></video>
+              </div>
+              <a class="download-link hidden" id="downloadVideoLink" href="#" download="tiktok-final-video.webm">下载最终影片</a>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js?v=20260624r"></script>
+  </body>
+</html>
