@@ -108,7 +108,7 @@ function saveDraft() {
     videoJsonText: $("videoJsonOutput").value,
     videoSettings: {
       version: "natural-pacing-v1",
-      clipCount: $("videoClipCount")?.value || "4",
+      clipCount: getSelectedVideoCount(),
       maxSeconds: $("videoMaxSeconds")?.value || "15"
     },
     characterReference: state.characterReference,
@@ -147,12 +147,15 @@ function loadDraft() {
     $("storyJsonOutput").value = draft.storyJson || "";
     $("videoJsonOutput").value = draft.videoJsonText || "";
     if (draft.videoSettings) {
-      $("videoClipCount").value = draft.videoSettings.version ? (draft.videoSettings.clipCount || "4") : "4";
+      const savedCount = draft.videoSettings.version ? (draft.videoSettings.clipCount || "4") : "4";
+      $("videoClipCount").value = savedCount;
+      $("storyboardVideoCount").value = savedCount;
       $("videoMaxSeconds").value = draft.videoSettings.maxSeconds || "15";
     }
     if (draft.storyJson) {
       state.storyboard = normalizeStoryboardPayload(JSON.parse(draft.storyJson));
       renderStoryboardCards(state.storyboard);
+      renderSingleImageJsonCards(JSON.parse(draft.storyJson));
     }
     if (draft.videoJsonText) {
       state.videoJson = JSON.parse(draft.videoJsonText);
@@ -362,7 +365,7 @@ const translationProfiles = {
   },
   ms: {
     label: "Bahasa Melayu",
-    languageInstruction: "Bahasa Melayu Malaysia (natural casual TikTok voiceover, voice-safe, no exaggerated guarantee claims)",
+    languageInstruction: "Bahasa Melayu Malaysia (Malaysian Malay, local casual TikTok Shop voiceover, not Indonesian, not Bahasa Indonesia, voice-safe, no exaggerated guarantee claims)",
     product: "produk ini",
     industry: "kategori ini",
     audience: "orang yang sedang hadapi masalah ini",
@@ -492,9 +495,9 @@ function getStoryboardLanguageCopy(target, values) {
         "No person on screen. Use product arrangement, realistic setting, clean details, and feedback feeling to build trust.",
         `No person on screen. Present ${product}, offer information, and the shopping-cart CTA area in one clean final frame.`
       ],
-      task: "Generate 5 separate images. Do not combine the 5 scenes into one image.",
+      task: "Generate separate images based on the selected video count. Do not combine the scenes into one image.",
       outputRules: [
-        "Output 5 separate image files: image_01 to image_05.",
+        "Output separate image files named image_01, image_02, and so on based on the selected count.",
         "Each image_prompt generates only one matching image.",
         "Do not create collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel output.",
         "Each image must be 9:16 for the next video step."
@@ -528,9 +531,9 @@ function getStoryboardLanguageCopy(target, values) {
         "Tiada orang dalam frame. Guna susunan produk, suasana real, detail bersih, dan rasa feedback untuk bina kepercayaan.",
         `Tiada orang dalam frame. Susun ${product}, info tawaran, dan kawasan CTA troli beli dalam satu frame akhir.`
       ],
-      task: "Jana 5 imej berasingan. Jangan gabungkan 5 scene dalam satu imej.",
+      task: "Jana imej berasingan ikut jumlah video yang dipilih. Jangan gabungkan scene dalam satu imej.",
       outputRules: [
-        "Output 5 fail imej berasingan: image_01 hingga image_05.",
+        "Output fail imej berasingan bernama image_01, image_02, dan seterusnya ikut jumlah yang dipilih.",
         "Setiap image_prompt hanya jana satu imej yang sepadan.",
         "Jangan jana collage, grid, storyboard sheet, contact sheet, split-screen, atau multi-panel.",
         "Setiap imej mesti 9:16 untuk langkah video seterusnya."
@@ -563,14 +566,60 @@ function getStoryboardLanguageCopy(target, values) {
       "无人出镜，用产品陈列、真实场景、使用反馈氛围和干净细节表现信任感。",
       `无人出镜，把${product}、优惠信息和购物车指向区域同框呈现，适合作为最后一张图。`
     ],
-    task: "一次生成 5 张独立图片，不要把 5 个画面集合在一张图。",
+    task: "按选择的影片数量生成独立图片，不要把多个画面集合在一张图。",
     outputRules: [
-      "请输出 5 个独立图片文件：image_01 到 image_05。",
+      "请按选择数量输出独立图片文件：image_01、image_02，以此类推。",
       "每个 image_prompt 只生成对应的一张图。",
       "不要生成拼贴图、九宫格、分镜表、contact sheet、split-screen 或 multi-panel。",
       "每张图都是 9:16，方便下一步各自生成一个短片。"
     ]
   };
+}
+
+function getStoryboardStage(copy, index, total) {
+  const mergeMaps = {
+    2: [[0, 1, 2], [3, 4]],
+    3: [[0, 1], [2], [3, 4]],
+    4: [[0], [1], [2], [3, 4]],
+    5: [[0], [1], [2], [3], [4]]
+  };
+  const indexes = (mergeMaps[total] || mergeMaps[4])[index] || [Math.min(index, 4)];
+  const title = indexes.map((item) => copy.titles[item]).filter(Boolean).join(" + ");
+  const usageStage = indexes.map((item) => copy.usageStages[item]).filter(Boolean).join(" / ");
+  const fallback = copy.fallbacks[indexes[indexes.length - 1]] || copy.fallbacks[index] || "";
+  const direction = indexes.map((item) => copy.directions[item]).filter(Boolean).join(" Then ");
+  const noPersonDirection = indexes.map((item) => copy.noPersonDirections[item]).filter(Boolean).join(" Then ");
+  return { indexes, title, usageStage, fallback, direction, noPersonDirection };
+}
+
+function buildImageOutputRules(target, count) {
+  const first = `image_01`;
+  const last = `image_${String(count).padStart(2, "0")}`;
+  if (target === "en") {
+    return [
+      `Output exactly ${count} separate image files: ${first} to ${last}.`,
+      "Each image_prompt generates only one matching image.",
+      "Each image must match its script_match_text.",
+      "Do not create collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel output.",
+      "Each image must be 9:16 for Seedance 2.0 image-to-video generation."
+    ];
+  }
+  if (target === "ms") {
+    return [
+      `Output tepat ${count} fail imej berasingan: ${first} hingga ${last}.`,
+      "Setiap image_prompt hanya jana satu imej yang sepadan.",
+      "Setiap imej mesti ikut script_match_text masing-masing.",
+      "Jangan jana collage, grid, storyboard sheet, contact sheet, split-screen, atau multi-panel.",
+      "Setiap imej mesti 9:16 untuk Seedance 2.0 image-to-video."
+    ];
+  }
+  return [
+    `请输出刚好 ${count} 个独立图片文件：${first} 到 ${last}。`,
+    "每个 image_prompt 只生成对应的一张图。",
+    "每张图必须对应自己的 script_match_text。",
+    "不要生成拼贴图、九宫格、分镜表、contact sheet、split-screen 或 multi-panel。",
+    "每张图都是 9:16，方便给 Seedance 2.0 图生视频。"
+  ];
 }
 
 function detectAngleCategory(brief) {
@@ -712,6 +761,115 @@ function generateAngles() {
   showToast("Hook 和 USP 已自动生成，请重新生成脚本");
 }
 
+function buildChatGptAnglePrompt() {
+  const brief = getBrief();
+  const target = getLanguageCode(brief.language);
+  const languageRules = {
+    zh: "马来西亚华语或中文，口语化、自然、适合 TikTok Shop 口播。不要讲“令吉”，价格直接讲“块”。",
+    en: "English, natural Malaysian TikTok Shop voiceover style, casual, clear, and voice-safe.",
+    ms: "Bahasa Melayu Malaysia, gaya TikTok Shop tempatan Malaysia. Jangan guna Bahasa Indonesia. Ayat mesti natural, santai, dan voice-safe."
+  };
+  const currentSuggestions = buildAngleSuggestions(brief, target);
+
+  return [
+    "你是 TikTok Shop 爆款短视频脚本策划。",
+    "请根据下面产品资料，生成更有吸引力的 Hook 和 USP。",
+    "",
+    "要求：",
+    `1. 语言：${languageRules[target] || languageRules.zh}`,
+    "2. Hook 要 3 秒内能讲完，像真人开场，不要太书面。",
+    "3. USP 1 是最强卖点，USP 2 是次要卖点，USP 3 是信任卖点。",
+    "4. 不要夸大承诺，不要写 100%、保证、永久、治疗、最便宜等高风险词。",
+    "5. 每一句要短，适合短视频口播，也方便后面生成图片和视频。",
+    "6. 只输出 JSON，不要解释，不要 markdown code block。",
+    "",
+    "产品资料：",
+    JSON.stringify(
+      {
+        product: brief.product || "未填写",
+        industry: brief.industry || "未填写",
+        target_audience: brief.audience || "未填写",
+        script_language: brief.language || defaultLanguage,
+        persona: brief.persona || brief.personaPreset || "未填写",
+        offer: brief.offer || "无",
+        cta: brief.cta || "无",
+        local_template_reference: currentSuggestions
+      },
+      null,
+      2
+    ),
+    "",
+    "请严格按这个格式输出：",
+    JSON.stringify(
+      {
+        hook: "一句 3 秒吸引开场",
+        usp1: "最强卖点，一句话",
+        usp2: "第二卖点，一句话",
+        usp3: "信任卖点，一句话"
+      },
+      null,
+      2
+    )
+  ].join("\n");
+}
+
+function copyChatGptAnglePrompt() {
+  const prompt = buildChatGptAnglePrompt();
+  const output = $("anglePromptOutput");
+  if (output) {
+    output.value = prompt;
+  }
+  copyText(prompt, "ChatGPT Prompt 已复制");
+}
+
+function parseAngleJson(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+
+  const withoutFence = raw
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+  const start = withoutFence.indexOf("{");
+  const end = withoutFence.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return null;
+
+  try {
+    return JSON.parse(withoutFence.slice(start, end + 1));
+  } catch (error) {
+    return null;
+  }
+}
+
+function applyChatGptAngleJson() {
+  const parsed = parseAngleJson($("angleJsonInput")?.value || "");
+  if (!parsed) {
+    showToast("找不到有效 JSON，请检查 ChatGPT 回答");
+    return;
+  }
+
+  const fields = ["hook", "usp1", "usp2", "usp3"];
+  let applied = 0;
+  fields.forEach((id) => {
+    if (parsed[id]) {
+      $(id).value = safeClaim(parsed[id]);
+      applied += 1;
+    }
+  });
+
+  if (!applied) {
+    showToast("JSON 里没有 hook / usp1 / usp2 / usp3");
+    return;
+  }
+
+  $("scriptOutput").value = "";
+  $("translatedScriptOutput").value = "";
+  clearGeneratedOutputs();
+  updateSummary();
+  saveDraft();
+  showToast("ChatGPT Hook / USP 已套用，请重新生成脚本");
+}
+
 function buildScriptForLanguage(target = "zh") {
   const brief = getBrief();
   const profile = translationProfiles[target] || translationProfiles.zh;
@@ -788,6 +946,7 @@ function clearGeneratedOutputs() {
   $("storyJsonOutput").value = "";
   $("videoJsonOutput").value = "";
   renderStoryboardCards([]);
+  renderSingleImageJsonCards(null);
   renderVideoPlanPreview(null);
 }
 
@@ -867,17 +1026,99 @@ function buildScript() {
   return script;
 }
 
-function getScriptLines() {
+function parseScriptSegments() {
   const raw = $("scriptOutput").value.trim() || buildScript();
   return raw
     .split(/\n+/)
-    .map((line) =>
-      line
-        .replace(/^\s*\d+\s*-\s*\d+\s*s\s*(?:[|｜~～\-–—]|至|到)?\s*/i, "")
-        .replace(/^[A-Za-z\u4e00-\u9fff ]{1,24}\s*[:：]\s*/, "")
-        .trim()
-    )
-    .filter(Boolean);
+    .map((line, index) => {
+      const original = cleanText(line);
+      let text = original;
+      let time = "";
+      let label = "";
+      const timeMatch = text.match(/^\s*(\d+\s*-\s*\d+\s*s)\s*(?:[|｜~～\-–—]|至|到)?\s*/i);
+      if (timeMatch) {
+        time = timeMatch[1].replace(/\s+/g, "");
+        text = text.slice(timeMatch[0].length).trim();
+      }
+      const labelMatch = text.match(/^([A-Za-z\u4e00-\u9fff ]{1,28})\s*[:：]\s*/);
+      if (labelMatch) {
+        label = labelMatch[1].trim();
+        text = text.slice(labelMatch[0].length).trim();
+      }
+      return {
+        script_segment_id: index + 1,
+        time,
+        label,
+        text: moneySafe(text),
+        original_line: original
+      };
+    })
+    .filter((segment) => segment.text);
+}
+
+function getScriptLines() {
+  return parseScriptSegments().map((segment) => segment.text);
+}
+
+function buildStoryboardScriptGroups(segments, desiredCount = 4) {
+  const count = clampNumber(desiredCount, 2, 5, 4);
+  const used = new Set();
+  const labelText = (segment) => `${segment.label} ${segment.text} ${segment.original_line}`.toLowerCase();
+
+  const pick = (patterns) => {
+    const selected = segments.filter((segment) => {
+      if (used.has(segment.script_segment_id)) return false;
+      return patterns.some((pattern) => pattern.test(labelText(segment)));
+    });
+    selected.forEach((segment) => used.add(segment.script_segment_id));
+    return selected;
+  };
+
+  let semanticGroups = [
+    pick([/hook/, /痛点/, /pain/, /masalah/, /buka/]),
+    pick([/产品/, /product/, /produk/]),
+    pick([/卖点/, /benefit/, /kelebihan/]),
+    pick([/信任/, /trust/, /kepercayaan/]),
+    pick([/优惠/, /offer/, /tawaran/, /cta/])
+  ];
+
+  const leftovers = segments.filter((segment) => !used.has(segment.script_segment_id));
+  leftovers.forEach((segment, index) => {
+    const targetIndex = semanticGroups.findIndex((group) => !group.length);
+    semanticGroups[targetIndex >= 0 ? targetIndex : Math.min(4, index)].push(segment);
+  });
+
+  if (semanticGroups.every((group) => !group.length)) {
+    semanticGroups = Array.from({ length: 5 }, () => []);
+    segments.forEach((segment, index) => {
+      semanticGroups[Math.min(4, Math.floor((index / Math.max(1, segments.length)) * 5))].push(segment);
+    });
+  }
+
+  const mergeMaps = {
+    2: [[0, 1, 2], [3, 4]],
+    3: [[0, 1], [2], [3, 4]],
+    4: [[0], [1], [2], [3, 4]],
+    5: [[0], [1], [2], [3], [4]]
+  };
+  const groups = (mergeMaps[count] || mergeMaps[4]).map((indexes) =>
+    indexes.flatMap((index) => semanticGroups[index] || [])
+  );
+
+  return groups.map((group, index) => {
+    const fallbackSegment = segments[Math.min(index, Math.max(0, segments.length - 1))];
+    const finalGroup = group.length ? group : (fallbackSegment ? [fallbackSegment] : []);
+    const labels = finalGroup.map((segment) => segment.label).filter(Boolean);
+    const times = finalGroup.map((segment) => segment.time).filter(Boolean);
+    return {
+      group_id: index + 1,
+      segment_ids: finalGroup.map((segment) => segment.script_segment_id),
+      labels,
+      time_range: times.length ? `${times[0]}${times.length > 1 ? ` - ${times[times.length - 1]}` : ""}` : "",
+      line: finalGroup.map((segment) => segment.text).filter(Boolean).join(" "),
+      original_lines: finalGroup.map((segment) => segment.original_line)
+    };
+  });
 }
 
 function shortOverlay(text, fallback) {
@@ -930,7 +1171,10 @@ function characterVisual(config, personText, noPersonText) {
 
 function buildStoryboard() {
   const brief = getBrief();
-  const scriptLines = getScriptLines();
+  const scriptSegments = parseScriptSegments();
+  const { requestedCount } = getVideoSettings();
+  const desiredImageCount = requestedCount;
+  const scriptGroups = buildStoryboardScriptGroups(scriptSegments, desiredImageCount);
   const storyboardLanguage = getLanguageCode(brief.language);
   const product = localizedValue(brief, storyboardLanguage, "product") || "产品";
   const audience = localizedValue(brief, storyboardLanguage, "audience") || "目标客户";
@@ -939,7 +1183,13 @@ function buildStoryboard() {
     ? localizedValue(brief, storyboardLanguage, "persona") || translationProfiles[storyboardLanguage].persona
     : characterConfig.persona;
   const place = inferScenePlace(brief);
-  const hook = scriptLines[0] || `${audience}是不是也遇到这个问题？`;
+  const scriptLine = (index, fallback) => moneySafe(scriptGroups[index]?.line || fallback);
+  const scriptGroup = (index) => scriptGroups[index] || { segment_ids: [], labels: [], time_range: "", line: "", original_lines: [] };
+  const scriptMatchRule = (index) => {
+    const group = scriptGroup(index);
+    return `Exact script segment for this image: "${group.line}". The visual must directly match this script segment and its stage. Do not show another part of the script, do not jump to CTA early, and do not show product reveal before the script calls for it.`;
+  };
+  const hook = scriptLine(0, `${audience}是不是也遇到这个问题？`);
   const usp1 = localizedValue(brief, storyboardLanguage, "usp1") || "简单有效";
   const usp2 = localizedValue(brief, storyboardLanguage, "usp2") || "省时间更方便";
   const usp3 = localizedValue(brief, storyboardLanguage, "usp3") || "真实使用更安心";
@@ -952,68 +1202,39 @@ function buildStoryboard() {
     ? `Use this character/persona consistently: ${persona}.`
     : characterConfig.prompt_note;
 
-  const scenes = [
-    {
-      id: 1,
-      image_id: "image_01",
+  const scenes = Array.from({ length: desiredImageCount }, (_, index) => {
+    const sceneNumber = index + 1;
+    const imageId = `image_${String(sceneNumber).padStart(2, "0")}`;
+    const stage = getStoryboardStage(languageCopy, index, desiredImageCount);
+    const fallbackLine = index === 0 ? hook : index === desiredImageCount - 1 ? cta : `${product} ${stage.fallback || ""}`;
+    const matchedScript = scriptLine(index, fallbackLine);
+    const visualDirection = characterVisual(characterConfig, stage.direction, stage.noPersonDirection);
+    const stagePrompt = index === 0
+      ? "opening or problem moment, no unrelated CTA yet"
+      : index === desiredImageCount - 1
+        ? "ending / offer / CTA moment only because this is the final script segment"
+        : "middle selling beat that matches this exact script segment";
+
+    return {
+      id: sceneNumber,
+      image_id: imageId,
       character: persona,
-      title: languageCopy.titles[0],
-      duration_sec: 4,
-      spoken_line: moneySafe(scriptLines[0] || hook),
-      text_overlay: shortOverlay(scriptLines[0] || hook, languageCopy.fallbacks[0]),
-      visual_direction: characterVisual(characterConfig, languageCopy.directions[0], languageCopy.noPersonDirections[0]),
-      image_prompt: `${standaloneImageRule} ${characterPromptNote} Vertical 9:16 TikTok commercial still, ${place}, ${characterConfig.mode === "no_person" ? "product-only problem moment, no person in frame" : `${persona} in the scene`}, close-up of the problem moment for ${audience}, realistic Malaysian lifestyle, natural light, authentic handheld framing, high detail, space for ${languageCopy.overlayLanguage} text overlay, ${baseNegative}`
-    },
-    {
-      id: 2,
-      image_id: "image_02",
-      character: persona,
-      title: languageCopy.titles[1],
-      duration_sec: 5,
-      spoken_line: moneySafe(scriptLines[2] || `${product}可以帮你更轻松处理。`),
-      text_overlay: shortOverlay(scriptLines[2] || product, languageCopy.fallbacks[1]),
-      visual_direction: characterVisual(characterConfig, languageCopy.directions[1], languageCopy.noPersonDirections[1]),
-      image_prompt: `${standaloneImageRule} ${characterPromptNote} Vertical 9:16 product reveal shot, ${product} shown clearly in a real Malaysian setting, ${characterConfig.mode === "no_person" ? "no person, clean product-only table composition" : `${persona} presenting it naturally`}, soft daylight, realistic commercial photography, no hard sell expression, ${baseNegative}`
-    },
-    {
-      id: 3,
-      image_id: "image_03",
-      character: persona,
-      title: languageCopy.titles[2],
-      duration_sec: 6,
-      spoken_line: moneySafe(scriptLines[3] || `重点是${usp1}，而且${usp2}。`),
-      text_overlay: shortOverlay(scriptLines[3] || usp1, languageCopy.fallbacks[2]),
-      visual_direction: characterVisual(characterConfig, languageCopy.directions[2], languageCopy.noPersonDirections[2]),
-      image_prompt: `${standaloneImageRule} ${characterPromptNote} Vertical 9:16 step-by-step demo still for ${product}, ${characterConfig.mode === "no_person" ? `product-only before-and-after demo showing ${usp1}` : `${persona} demonstrates the main benefit: ${usp1}`}, clear before-and-after composition, Malaysian home or shop context, practical and believable, ${baseNegative}`
-    },
-    {
-      id: 4,
-      image_id: "image_04",
-      character: persona,
-      title: languageCopy.titles[3],
-      duration_sec: 6,
-      spoken_line: moneySafe(scriptLines[4] || `${usp3}，所以日常用也安心。`),
-      text_overlay: shortOverlay(scriptLines[4] || usp3, languageCopy.fallbacks[3]),
-      visual_direction: characterVisual(characterConfig, languageCopy.directions[3], languageCopy.noPersonDirections[3]),
-      image_prompt: `${standaloneImageRule} ${characterPromptNote} Vertical 9:16 trust-building commercial still, ${characterConfig.mode === "no_person" ? `${product} in a realistic trusted-use setting, product-only scene` : `${persona} with ${product}`}, subtle proof cues, clean background, authentic social commerce style, avoid fake certificates, ${baseNegative}`
-    },
-    {
-      id: 5,
-      image_id: "image_05",
-      character: persona,
-      title: languageCopy.titles[4],
-      duration_sec: 5,
-      spoken_line: moneySafe(scriptLines[5] || scriptLines[6] || cta),
-      text_overlay: shortOverlay(scriptLines[6] || scriptLines[5] || cta, languageCopy.fallbacks[4]),
-      visual_direction: characterVisual(characterConfig, languageCopy.directions[4], languageCopy.noPersonDirections[4]),
-      image_prompt: `${standaloneImageRule} ${characterPromptNote} Vertical 9:16 TikTok shop ending card still, ${product} arranged neatly with warm sales moment, ${characterConfig.mode === "no_person" ? "no person, clean product-only CTA composition" : `${persona} points toward lower shopping cart area`}, clean composition, room for bold ${languageCopy.overlayLanguage} CTA overlay, energetic but not messy, ${baseNegative}`
-    }
-  ];
+      title: stage.title || `Scene ${sceneNumber}`,
+      duration_sec: Math.max(5, estimateNarrationSeconds(matchedScript, storyboardLanguage)),
+      script_segments: scriptGroup(index).segment_ids,
+      script_time_range: scriptGroup(index).time_range,
+      script_match_text: matchedScript,
+      spoken_line: matchedScript,
+      text_overlay: shortOverlay(matchedScript, stage.fallback),
+      visual_direction: visualDirection,
+      image_prompt: `${standaloneImageRule} ${scriptMatchRule(index)} ${characterPromptNote} Vertical 9:16 Seedance 2.0 image-to-video keyframe, ${place}, ${stagePrompt}, ${visualDirection}, ${product} visible when relevant, realistic Malaysian TikTok Shop commercial style, natural light, authentic handheld framing, high detail, ${baseNegative}`
+    };
+  });
 
   scenes.forEach((scene) => {
     scene.language = brief.language || defaultLanguage;
     scene.language_code = storyboardLanguage;
-    scene.usage_stage = languageCopy.usageStages?.[scene.id - 1] || "";
+    scene.usage_stage = getStoryboardStage(languageCopy, scene.id - 1, desiredImageCount).usageStage || "";
     scene.video_usage_hint = scene.usage_stage;
     scene.character_mode = characterConfig.mode;
     scene.character_config = {
@@ -1030,7 +1251,17 @@ function buildStoryboard() {
 
   const imageBatch = {
     language: brief.language || defaultLanguage,
-    task: languageCopy.task,
+    task: `Generate exactly ${desiredImageCount} separate images based on the selected video count. Do not combine images into one output.`,
+    selected_video_count: desiredImageCount,
+    seedance_2_0_workflow: "Generate these images first, then use each image together with its matching video_0x JSON in Seedance 2.0.",
+    script_to_image_mapping: scenes.map((scene) => ({
+      image_id: scene.image_id,
+      title: scene.title,
+      script_segments: scene.script_segments,
+      script_time_range: scene.script_time_range,
+      script_match_text: scene.script_match_text,
+      usage_stage: scene.usage_stage
+    })),
     character_config: {
       mode: characterConfig.mode,
       label: characterConfig.label,
@@ -1038,21 +1269,18 @@ function buildStoryboard() {
       reference_image: characterConfig.reference,
       prompt_note: characterConfig.prompt_note
     },
-    output_rule: languageCopy.outputRules,
-    image_usage_guide: {
-      image_01: languageCopy.usageStages?.[0] || "Opening / pain point image.",
-      image_02: languageCopy.usageStages?.[1] || "Product reveal image.",
-      image_03: languageCopy.usageStages?.[2] || "Benefit demo image.",
-      image_04: languageCopy.usageStages?.[3] || "Trust proof image.",
-      image_05: languageCopy.usageStages?.[4] || "Final CTA image.",
-      next_step_note: "Step 3 will group these image IDs into video_01, video_02, etc. The video JSON preview will show exactly which image to upload for each Higgsfield video."
-    },
+    output_rule: buildImageOutputRules(storyboardLanguage, desiredImageCount),
+    image_usage_guide: Object.fromEntries([
+      ...scenes.map((scene) => [scene.image_id, scene.usage_stage]),
+      ["next_step_note", "Step 3 will generate the same number of video_0x JSON files. Use each video_0x JSON together with its matching image_0x in Seedance 2.0."]
+    ]),
     images: scenes
   };
 
   state.storyboard = scenes;
   $("storyJsonOutput").value = JSON.stringify(imageBatch, null, 2);
   renderStoryboardCards(scenes);
+  renderSingleImageJsonCards(imageBatch);
   saveDraft();
   showToast("图片 JSON 已生成");
   return scenes;
@@ -1061,7 +1289,7 @@ function buildStoryboard() {
 function renderStoryboardCards(scenes) {
   const container = $("storyboardCards");
   if (!scenes.length) {
-    container.innerHTML = '<p class="empty-state">生成后会看到 5 张分镜图卡。</p>';
+    container.innerHTML = '<p class="empty-state">生成后会看到按影片数量切好的分镜图卡。</p>';
     return;
   }
 
@@ -1076,6 +1304,7 @@ function renderStoryboardCards(scenes) {
         <div class="scene-body">
           <p><strong>图片：</strong>${scene.image_id || `image_${String(scene.id).padStart(2, "0")}`}</p>
           <p><strong>用途：</strong>${escapeHtml(scene.usage_stage || "")}</p>
+          <p><strong>对应剧本：</strong>${escapeHtml(scene.script_match_text || scene.spoken_line || "")}</p>
           <p><strong>人物：</strong>${scene.character || "自然口播人物"}</p>
           <p><strong>字幕：</strong>${scene.text_overlay}</p>
           <p><strong>口播：</strong>${scene.spoken_line}</p>
@@ -1083,6 +1312,100 @@ function renderStoryboardCards(scenes) {
       </article>
     `
     )
+    .join("");
+}
+
+function buildSingleImageJson(project, scene) {
+  return {
+    filename: `${scene.image_id}.json`,
+    image_id: scene.image_id,
+    generator: "GPTimg / image generator",
+    aspect_ratio: "9:16",
+    paired_video_json: `video_${String(scene.id).padStart(2, "0")}.json`,
+    seedance_2_0_pairing: `Generate ${scene.image_id} first, then use it together with video_${String(scene.id).padStart(2, "0")}.json in Seedance 2.0.`,
+    usage_stage: scene.usage_stage,
+    script_segments: scene.script_segments || [],
+    script_time_range: scene.script_time_range || "",
+    script_match_text: scene.script_match_text || scene.spoken_line || "",
+    character: scene.character,
+    character_mode: scene.character_mode,
+    character_reference: scene.character_reference || null,
+    visual_direction: scene.visual_direction,
+    prompt: scene.image_prompt,
+    rules: [
+      "Generate only one standalone image for this JSON.",
+      `This image must be saved/recognized as ${scene.image_id}.`,
+      "Do not combine multiple scenes into one image.",
+      "Do not create collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel output.",
+      "The visual must match script_match_text exactly and must not jump to another part of the script.",
+      "Use this image only with its paired Seedance 2.0 video JSON."
+    ],
+    project_context: {
+      language: project?.language || defaultLanguage,
+      selected_video_count: project?.selected_video_count || state.storyboard.length || null
+    }
+  };
+}
+
+function getSingleImageJsonFiles(batch = null) {
+  let images = [];
+  let project = batch;
+  if (batch?.images?.length) {
+    images = batch.images;
+  } else if (state.storyboard.length) {
+    images = state.storyboard;
+  } else {
+    const text = $("storyJsonOutput")?.value?.trim();
+    if (text) {
+      try {
+        project = JSON.parse(text);
+        images = Array.isArray(project.images) ? project.images : [];
+      } catch (error) {
+        images = [];
+      }
+    }
+  }
+
+  return images.map((scene) => ({
+    filename: `${scene.image_id || `image_${String(scene.id).padStart(2, "0")}`}.json`,
+    image_id: scene.image_id || `image_${String(scene.id).padStart(2, "0")}`,
+    paired_video_id: `video_${String(scene.id).padStart(2, "0")}`,
+    usage_stage: scene.usage_stage || "",
+    script_match_text: scene.script_match_text || scene.spoken_line || "",
+    json: buildSingleImageJson(project, scene)
+  }));
+}
+
+function renderSingleImageJsonCards(batch) {
+  const container = $("singleImageJsonList");
+  if (!container) return;
+
+  const files = getSingleImageJsonFiles(batch);
+  if (!files.length) {
+    container.innerHTML = '<p class="empty-state">生成后会出现每张图片的单独 JSON。</p>';
+    return;
+  }
+
+  container.innerHTML = files
+    .map((file) => {
+      const jsonText = JSON.stringify(file.json, null, 2);
+      return `
+        <article class="single-json-card">
+          <header>
+            <div>
+              <strong>${escapeHtml(file.filename)}</strong>
+              <small>${escapeHtml(file.image_id)} → ${escapeHtml(file.paired_video_id)} | ${escapeHtml(file.usage_stage)}</small>
+              <small>${escapeHtml(file.script_match_text)}</small>
+            </div>
+            <div class="button-row">
+              <button class="ghost-btn" type="button" data-action="copy-single-image-json" data-image-id="${escapeHtml(file.image_id)}">复制</button>
+              <button class="ghost-btn" type="button" data-action="download-single-image-json" data-image-id="${escapeHtml(file.image_id)}">下载</button>
+            </div>
+          </header>
+          <textarea readonly>${escapeHtml(jsonText)}</textarea>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -1094,9 +1417,20 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
+function getVoiceAccentInstruction(languageCode, language = "") {
+  if (languageCode === "ms") {
+    return "Voice must be Bahasa Melayu Malaysia / Malaysian Malay. Use a local Malaysian Malay accent, rhythm, and casual TikTok Shop seller tone. Do not use Indonesian accent, Bahasa Indonesia wording, formal news-reader Malay, or robotic textbook pronunciation. Prefer natural Malaysian words like tak, nak, boleh, tengok, senang, leceh, sekarang, troli when they fit the script. Keep it friendly, clear, and conversational.";
+  }
+  if (languageCode === "en") {
+    return "Voice must sound like natural Malaysian TikTok English: casual, clear, friendly, and not overly formal.";
+  }
+  return `Voice must match this script language naturally: ${language || defaultLanguage}. Speak casually and clearly.`;
+}
+
 function buildVoiceConfig(brief) {
   const mode = brief.voiceMode || "ai";
   const languageCode = getLanguageCode(brief.language);
+  const accentInstruction = getVoiceAccentInstruction(languageCode, brief.language);
   if (mode === "none") {
     return {
       mode: "no_voiceover",
@@ -1112,17 +1446,15 @@ function buildVoiceConfig(brief) {
       reference_audio_filename: sample?.name || "upload_15_second_voice_sample.wav",
       reference_duration_seconds: sample?.duration ? Number(sample.duration.toFixed(1)) : null,
       reference_status: sample ? (sample.isRecommendedLength ? "ready" : "duration_not_around_15_seconds") : "missing_upload",
-      instruction: "Upload this same 15-second voice sample in Higgsfield voice clone / voice reference if available. Use the cloned voice for the narration text."
+      accent_instruction: accentInstruction,
+      instruction: `Upload this same 15-second voice sample in Higgsfield voice clone / voice reference if available. Use the cloned voice for the narration text. ${accentInstruction}`
     };
   }
 
   return {
     mode: "ai_voice",
-    instruction: languageCode === "en"
-      ? "Use a natural English AI voice for Malaysian TikTok. Speak casually and clearly."
-      : languageCode === "ms"
-        ? "Use a natural Bahasa Melayu Malaysia AI voice. Speak casually and clearly."
-        : `Use a natural AI voice matching this script language: ${brief.language || defaultLanguage}. Speak casually and clearly.`
+    accent_instruction: accentInstruction,
+    instruction: accentInstruction
   };
 }
 
@@ -1132,9 +1464,21 @@ function clampNumber(value, min, max, fallback) {
   return Math.min(max, Math.max(min, parsed));
 }
 
+function getSelectedVideoCount() {
+  return String(clampNumber($("storyboardVideoCount")?.value || $("videoClipCount")?.value, 2, 5, 4));
+}
+
+function syncVideoCount(value) {
+  const count = String(clampNumber(value, 2, 5, 4));
+  if ($("storyboardVideoCount")) $("storyboardVideoCount").value = count;
+  if ($("videoClipCount")) $("videoClipCount").value = count;
+  return count;
+}
+
 function getVideoSettings() {
+  const requestedCount = Number(syncVideoCount(getSelectedVideoCount()));
   return {
-    requestedCount: clampNumber($("videoClipCount")?.value, 2, 5, 4),
+    requestedCount,
     maxSeconds: clampNumber($("videoMaxSeconds")?.value, 5, 15, 15)
   };
 }
@@ -1229,7 +1573,9 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     image_id: inputImageIds[sceneIndex],
     title: scene.title,
     duration_sec: getSceneSeconds(scene),
-    usage_stage: scene.usage_stage || scene.video_usage_hint || ""
+    usage_stage: scene.usage_stage || scene.video_usage_hint || "",
+    script_segments: scene.script_segments || [],
+    script_match_text: scene.script_match_text || scene.spoken_line || ""
   }));
   const imageUsageForVideo = group.map((scene, sceneIndex) => ({
     image_id: inputImageIds[sceneIndex],
@@ -1237,6 +1583,7 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     scene_id: scene.id,
     scene_title: scene.title,
     usage_stage: scene.usage_stage || scene.video_usage_hint || "",
+    script_match_text: scene.script_match_text || scene.spoken_line || "",
     instruction: sceneIndex === 0
       ? `Upload ${inputImageIds[sceneIndex]} as the main/start image for ${clipId}.`
       : `If Higgsfield allows extra reference images, add ${inputImageIds[sceneIndex]} as a reference for this same ${clipId}.`
@@ -1252,6 +1599,7 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
   const characterConfig = group.find((scene) => scene.character_config)?.character_config || null;
   const characterVideoRule = group.find((scene) => scene.character_video_rule)?.character_video_rule || "";
   const noTextOverlayRule = buildNoTextOverlayRule();
+  const voiceAccentInstruction = getVoiceAccentInstruction(clipLanguageCode);
 
   return {
     scene_ids: group.map((scene) => scene.id),
@@ -1263,6 +1611,8 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     upload_image_instruction: `For ${clipId}: upload ${inputImageIds[0]} as the main/start image.${inputImageIds.length > 1 ? ` Add ${inputImageIds.slice(1).join(", ")} only as optional reference images if Higgsfield supports multiple references.` : ""}`,
     title: sceneTitles,
     duration_sec: durationSec,
+    seedance_seconds: durationSec,
+    seedance_2_0_instruction: `Use ${inputImageIds[0]} with ${clipId}.json in Seedance 2.0. Generate one standalone ${durationSec}-second vertical 9:16 video segment.`,
     higgsfield_seconds: durationSec,
     higgsfield_web_instruction: timingNote,
     character_mode: characterConfig?.mode || "persona",
@@ -1270,9 +1620,10 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     character_reference: characterConfig?.reference_image || null,
     character_video_rule: characterVideoRule,
     source_image_prompts: group.map((scene) => scene.image_prompt),
-    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference. ${characterVideoRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, motion smooth, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
+    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference. ${characterVideoRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, motion smooth, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Voice instruction: ${voiceAccentInstruction} Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
     camera_motion: index === 0 ? "slow push-in, then natural handheld movement between beats" : index === totalGroups - 1 ? "gentle handheld movement ending on CTA area" : "small handheld movement with smooth beat-to-beat transitions",
     narration,
+    voice_accent_instruction: voiceAccentInstruction,
     narration_estimated_seconds: narrationSeconds,
     pacing_note: pacingWarning,
     caption_overlay: null,
@@ -1288,13 +1639,16 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
 function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip) {
   return {
     job_name: clip.clip_id,
+    generator: "Seedance 2.0 image-to-video",
     input_image: clip.input_image_id,
     input_images: clip.input_image_ids || [clip.input_image_id],
     image_usage_for_video: clip.image_usage_for_video || [],
+    seedance_2_0_instruction: `Use ${clip.input_image_id} together with this JSON to generate ${clip.clip_id}. Set duration around ${clip.higgsfield_seconds || clip.duration_sec} seconds. Keep the output as one standalone vertical 9:16 video segment.`,
     upload_image_note: clip.upload_image_instruction || `Upload/use ${clip.input_image_id} as the main image for this job. If Higgsfield allows extra references, add: ${(clip.input_image_ids || [clip.input_image_id]).join(", ")}.`,
     output_filename: `${clip.clip_id}.mp4`,
     aspect_ratio: "9:16",
     duration_seconds: clip.duration_sec,
+    seedance_seconds: clip.higgsfield_seconds || clip.duration_sec,
     higgsfield_seconds: clip.higgsfield_seconds || clip.duration_sec,
     higgsfield_web_instruction: clip.higgsfield_web_instruction || `Choose ${clip.duration_sec}s in Higgsfield web for this JSON.`,
     scenes_included: clip.scenes_included || [],
@@ -1310,6 +1664,7 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       language,
       persona,
       text: clip.narration,
+      accent_instruction: clip.voice_accent_instruction || getVoiceAccentInstruction(getLanguageCode(language), language),
       pacing: "natural, conversational, not rushed",
       pacing_note: clip.pacing_note || "Shorten/summarize the voiceover if needed; never speed-read."
     },
@@ -1322,6 +1677,7 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       `Generate only ${clip.clip_id}.`,
       `Set duration to ${clip.higgsfield_seconds || clip.duration_sec} seconds in Higgsfield web.`,
       `Use ${clip.input_image_id} as the main/start image.`,
+      clip.voice_accent_instruction || getVoiceAccentInstruction(getLanguageCode(language), language),
       "Use natural voice pacing. Do not speed up the narration to force it into the clip.",
       "If narration feels too long, shorten/summarize it while keeping the meaning.",
       buildNoTextOverlayRule(),
@@ -1344,18 +1700,18 @@ function buildVideoJson() {
   const brief = getBrief();
   let scenes = state.storyboard.length ? state.storyboard : buildStoryboard();
   const videoLanguageCode = getLanguageCode(brief.language);
-  if (state.storyboard.length && scenes.some((scene) => scene.character_mode !== brief.characterMode || scene.language_code !== videoLanguageCode)) {
+  const { requestedCount, maxSeconds } = getVideoSettings();
+  if (state.storyboard.length && (scenes.length !== requestedCount || scenes.some((scene) => scene.character_mode !== brief.characterMode || scene.language_code !== videoLanguageCode))) {
     scenes = buildStoryboard();
   }
   const product = safeClaim(brief.product || "产品");
   const persona = safeClaim(brief.persona || "自然口播人物");
   const voiceConfig = buildVoiceConfig(brief);
-  const { requestedCount, maxSeconds } = getVideoSettings();
   const groups = groupScenesForVideo(scenes, requestedCount, maxSeconds);
   const videoClips = groups.map((group, index) => buildGroupedVideoClip(group, index, groups.length, maxSeconds));
   const totalDuration = videoClips.reduce((sum, clip) => sum + Number(clip.duration_sec || 0), 0);
   const visualCharacterConfig = scenes.find((scene) => scene.character_config)?.character_config || buildCharacterConfig(brief);
-  const voiceStyle = brief.language || translationProfiles[videoLanguageCode]?.languageInstruction || "马来西亚华语，口语化，自然，有信任感，不念“令吉”，价格直接说“块”";
+  const voiceStyle = voiceConfig.accent_instruction || brief.language || translationProfiles[videoLanguageCode]?.languageInstruction || "马来西亚华语，口语化，自然，有信任感，不念“令吉”，价格直接说“块”";
 
   const videoJson = {
     project_name: `${product} TikTok 短视频`,
@@ -1370,9 +1726,12 @@ function buildVideoJson() {
     visual_character_config: visualCharacterConfig,
     voice_config: voiceConfig,
     task: `分别生成 ${videoClips.length} 个短片，每个短片最多 ${maxSeconds} 秒。不要一次生成一条完整影片。生成 video_01 到 video_${String(videoClips.length).padStart(2, "0")} 后，再回到本工具第四步合成。`,
-    higgsfield_usage: "不要把这个总览 JSON 整包贴去 Higgsfield。请复制下面 single_video_json_files 里的其中一个单独 JSON，一次只生成一个 video_0x，并按照 higgsfield_seconds 在网页选择秒数。",
+    seedance_2_0_usage: "不要把总览 JSON、全部图片一次丢进 Seedance。请复制 single_video_json_files 里的一个单独 JSON，并搭配对应的 image_0x，一次只生成一个 video_0x。",
+    higgsfield_usage: "如果还使用 Higgsfield，也请一次只复制一个 single_video_json，并按照 higgsfield_seconds 在网页选择秒数。",
     generation_notes: [
-      "每个 single_video_json_files 里的 JSON 都是一个独立 Higgsfield 网页任务。",
+      "Seedance 2.0 用法：每个 video_0x 只配对应的 image_0x 和该段 JSON，不要把全部图片和全部 JSON 一次丢进去。",
+      ...(videoLanguageCode === "ms" ? ["如果使用 Bahasa Melayu，声音必须是 Bahasa Melayu Malaysia / Malaysian Malay，本地马来西亚口音；不要印尼腔、不要 Bahasa Indonesia、不要太正式的新闻播报腔。"] : []),
+      "每个 single_video_json_files 里的 JSON 都是一个独立 Seedance 2.0 图生视频任务。",
       "每个 JSON 都有 higgsfield_seconds；在 Higgsfield 网页就选这个秒数。这个秒数已按自然口播速度估算。",
       "如果口播还是太赶，不要加速讲话；请把影片段数改成 5 段，或缩短该段 voiceover text。",
       "如果一个 video_0x 包含多个 image_id，请用第一个 image_id 做主图；网页支持参考图时再补其他图。",
@@ -1386,6 +1745,7 @@ function buildVideoJson() {
     final_cta: moneySafe(brief.cta || "点击下面黄色购物车了解更多"),
     export_format: {
       recommended: "1080x1920, 30fps, MP4 if the video generator supports it",
+      seedance_2_0: "Generate each video_0x separately from its matching image_0x, then merge the exported clips in Step 4.",
       local_browser_merge: "This tool exports WebM from uploaded clips because it uses built-in browser recording."
     }
   };
@@ -1397,8 +1757,12 @@ function buildVideoJson() {
     input_image_ids: clip.input_image_ids,
     image_usage_for_video: clip.image_usage_for_video,
     upload_image_instruction: clip.upload_image_instruction,
+    seedance_2_0_pairing: `Use this JSON with ${clip.input_image_id}.`,
+    seedance_2_0_instruction: clip.seedance_2_0_instruction,
     higgsfield_seconds: clip.higgsfield_seconds,
+    seedance_seconds: clip.higgsfield_seconds,
     higgsfield_web_instruction: clip.higgsfield_web_instruction,
+    voice_accent_instruction: clip.voice_accent_instruction,
     narration_estimated_seconds: clip.narration_estimated_seconds,
     pacing_note: clip.pacing_note,
     character_mode: clip.character_mode,
@@ -1468,6 +1832,7 @@ function getSingleVideoJsonFiles(plan = state.videoJson) {
         input_image_ids: file.input_image_ids || file.json?.input_images || [file.input_image_id || file.json?.input_image].filter(Boolean),
         image_usage_for_video: file.image_usage_for_video || file.json?.image_usage_for_video || [],
         upload_image_instruction: file.upload_image_instruction || file.json?.upload_image_note || "",
+        seedance_2_0_pairing: file.seedance_2_0_pairing || file.json?.seedance_2_0_instruction || "",
         higgsfield_seconds: seconds,
         higgsfield_web_instruction: file.higgsfield_web_instruction || file.json?.higgsfield_web_instruction || (seconds ? `在 Higgsfield 网页选择 ${seconds} 秒。` : "")
       };
@@ -1482,6 +1847,7 @@ function getSingleVideoJsonFiles(plan = state.videoJson) {
     input_image_ids: clip.input_image_ids || [clip.input_image_id],
     image_usage_for_video: clip.image_usage_for_video || [],
     upload_image_instruction: clip.upload_image_instruction || "",
+    seedance_2_0_pairing: clip.seedance_2_0_instruction || "",
     higgsfield_seconds: clip.higgsfield_seconds || clip.duration_sec,
     higgsfield_web_instruction: clip.higgsfield_web_instruction || `在 Higgsfield 网页选择 ${clip.duration_sec} 秒。`,
     json: buildSingleVideoJson(
@@ -1513,7 +1879,7 @@ function renderSingleVideoJsonCards(plan) {
             <div>
               <strong>${escapeHtml(file.filename)}</strong>
               <small>${formatImageUsage(file.image_usage_for_video, file.input_image_ids || [file.input_image_id])} → ${escapeHtml(file.clip_id)} | ${escapeHtml(file.higgsfield_seconds)}s</small>
-              <small>${escapeHtml(file.upload_image_instruction || file.higgsfield_web_instruction || "")}</small>
+              <small>${escapeHtml(file.seedance_2_0_pairing || file.upload_image_instruction || file.higgsfield_web_instruction || "")}</small>
             </div>
             <div class="button-row">
               <button class="ghost-btn" type="button" data-action="copy-single-video-json" data-clip-id="${escapeHtml(file.clip_id)}">复制</button>
@@ -1606,6 +1972,8 @@ function clearAll() {
   $("clipInput").value = "";
   $("characterReference").value = "";
   $("voiceSample").value = "";
+  syncVideoCount("4");
+  $("videoMaxSeconds").value = "15";
   renderStoryboardCards([]);
   renderVideoPlanPreview(null);
   renderClipList();
@@ -2076,6 +2444,23 @@ function handleActionClick(event) {
     const index = Number(button.dataset.clipIndex);
     moveClip(index, action === "move-clip-up" ? -1 : 1);
   }
+  if (action === "copy-single-image-json") {
+    event.preventDefault();
+    const imageId = button.dataset.imageId;
+    const file = getSingleImageJsonFiles().find((item) => item.image_id === imageId);
+    if (file) {
+      copyText(JSON.stringify(file.json, null, 2), `${imageId} JSON 已复制`);
+    }
+  }
+  if (action === "download-single-image-json") {
+    event.preventDefault();
+    const imageId = button.dataset.imageId;
+    const file = getSingleImageJsonFiles().find((item) => item.image_id === imageId);
+    if (file) {
+      downloadText(file.filename, JSON.stringify(file.json, null, 2), "application/json");
+      showToast(`${imageId} JSON 已下载`);
+    }
+  }
   if (action === "copy-single-video-json") {
     event.preventDefault();
     const clipId = button.dataset.clipId;
@@ -2130,6 +2515,8 @@ function bindEvents() {
 
   $("generateScriptBtn").addEventListener("click", buildScript);
   $("generateAnglesBtn").addEventListener("click", generateAngles);
+  $("copyAnglePromptBtn").addEventListener("click", copyChatGptAnglePrompt);
+  $("applyAngleJsonBtn").addEventListener("click", applyChatGptAngleJson);
   $("ctaPreset").addEventListener("change", () => {
     if ($("ctaPreset").value) {
       $("cta").value = $("ctaPreset").value;
@@ -2165,14 +2552,25 @@ function bindEvents() {
   $("downloadStoryBtn").addEventListener("click", () => downloadText("image-prompts.json", $("storyJsonOutput").value, "application/json"));
   $("downloadVideoJsonBtn").addEventListener("click", () => downloadText("separate-video-prompts.json", $("videoJsonOutput").value, "application/json"));
 
-  ["videoClipCount", "videoMaxSeconds"].forEach((id) => {
+  ["storyboardVideoCount", "videoClipCount"].forEach((id) => {
     $(id).addEventListener("change", () => {
-      if ($("videoJsonOutput").value.trim() || state.videoJson) {
-        buildVideoJson();
+      syncVideoCount($(id).value);
+      if ($("storyJsonOutput").value.trim() || $("videoJsonOutput").value.trim() || state.storyboard.length || state.videoJson) {
+        clearGeneratedOutputs();
+        saveDraft();
+        showToast("影片数量已改变，请重新生成图片 JSON 和影片 JSON");
       } else {
         saveDraft();
       }
     });
+  });
+
+  $("videoMaxSeconds").addEventListener("change", () => {
+    if ($("videoJsonOutput").value.trim() || state.videoJson) {
+      buildVideoJson();
+    } else {
+      saveDraft();
+    }
   });
 
   $("translationTarget").addEventListener("change", saveDraft);
@@ -2201,6 +2599,7 @@ function bindEvents() {
 bindEvents();
 loadDraft();
 renderStoryboardCards(state.storyboard);
+renderSingleImageJsonCards(null);
 renderVideoPlanPreview(state.videoJson);
 updateCharacterStatus();
 updateVoiceCloneStatus();

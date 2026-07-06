@@ -455,7 +455,7 @@ textarea:focus {
 
 .storyboard-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -584,6 +584,13 @@ textarea:focus {
   background: #101720;
   color: #eef7f8;
   border-color: #101720;
+}
+
+.mini-output {
+  min-height: 108px;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .plan-row {

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TikTok 爆款短视频生成脑图工具</title>
-    <link rel="stylesheet" href="styles.css?v=20260706c" />
+    <link rel="stylesheet" href="styles.css?v=20260706h" />
   </head>
   <body>
     <div class="app-shell">
@@ -35,7 +35,7 @@
               <span class="node-index">2</span>
               <span>
                 <span class="node-title">图片与口播</span>
-                <span class="node-sub">4-5 张图 prompt JSON</span>
+                <span class="node-sub">按影片数量生成图 prompt JSON</span>
               </span>
             </button>
             <button class="map-node" type="button" data-step="3">
@@ -104,7 +104,7 @@
                   <option value="马来西亚华语（口语化、自然、Voice-safe、不讲“令吉”，直接讲“块”）">马来西亚华语</option>
                   <option value="中文普通话（口语化、自然、Voice-safe）">中文普通话</option>
                   <option value="English (natural Malaysian TikTok voiceover, casual, voice-safe, no exaggerated guarantee claims)">English</option>
-                  <option value="Bahasa Melayu Malaysia (natural casual TikTok voiceover, voice-safe, no exaggerated guarantee claims)">Bahasa Melayu</option>
+                      <option value="Bahasa Melayu Malaysia (Malaysian Malay, local casual TikTok Shop voiceover, not Indonesian, not Bahasa Indonesia, voice-safe)">Bahasa Melayu</option>
                 </select>
               </label>
 
@@ -167,8 +167,14 @@
               <div class="voice-panel">
                 <div class="button-row">
                   <button class="ghost-btn" type="button" id="generateAnglesBtn">自动生成 Hook / USP</button>
+                  <button class="ghost-btn" type="button" id="copyAnglePromptBtn">复制 ChatGPT Prompt</button>
                 </div>
-                <p class="helper-text">根据产品、行业、目标客户和 Script Language 自动补 Hook、USP 1、USP 2、USP 3。</p>
+                <p class="helper-text">自动生成是本地模板；ChatGPT Prompt 是手动复制模式，不需要 API key。</p>
+                <textarea id="anglePromptOutput" class="mini-output" rows="6" readonly placeholder="点击“复制 ChatGPT Prompt”后，这里会出现可复制给 ChatGPT 的提示词。"></textarea>
+                <textarea id="angleJsonInput" class="mini-output" rows="5" placeholder="把 ChatGPT 回答的 JSON 粘贴这里，再点“套用 ChatGPT JSON”。"></textarea>
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" id="applyAngleJsonBtn">套用 ChatGPT JSON</button>
+                </div>
               </div>
 
               <label>
@@ -255,9 +261,23 @@
             <div class="tool-panel">
               <div class="section-heading">
                 <p class="eyebrow">Step 2</p>
-                <h3>生成 4-5 张制作剧本影片的图</h3>
+                <h3>按影片数量生成剧本图片</h3>
               </div>
-              <p class="helper-text">每张图卡会标明用途阶段：开场、产品、卖点、信任、CTA。</p>
+              <p class="helper-text">图片会按照当前口播脚本切段生成；每张图卡会标明用途阶段和对应剧本原句。</p>
+              <div class="video-settings">
+                <div class="field-row">
+                  <label>
+                    <span>影片 / 图片数量</span>
+                    <select id="storyboardVideoCount">
+                      <option value="2">2 段 / 2 张图</option>
+                      <option value="3">3 段 / 3 张图</option>
+                      <option value="4" selected>4 段 / 4 张图</option>
+                      <option value="5">5 段 / 5 张图</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="helper-text">先选数量，再生成图片 JSON。之后 Step 3 会生成同样数量的 Seedance 2.0 分段 JSON。</p>
+              </div>
               <div class="storyboard-grid" id="storyboardCards" aria-live="polite"></div>
               <div class="button-row">
                 <button class="primary-btn" type="button" id="generateStoryBtn">生成图片 JSON</button>
@@ -268,12 +288,13 @@
             <div class="tool-panel output-panel">
               <div class="section-heading compact">
                 <p class="eyebrow">Image Prompt JSON</p>
-                <h3>一次生成 5 张独立图片</h3>
+                <h3>按数量生成独立图片</h3>
               </div>
+              <div class="single-json-list" id="singleImageJsonList"></div>
               <textarea id="storyJsonOutput" class="output-area code-area" rows="26"></textarea>
               <div class="button-row">
-                <button class="ghost-btn" type="button" id="copyStoryBtn">复制 JSON</button>
-                <button class="ghost-btn" type="button" id="downloadStoryBtn">下载 JSON</button>
+                <button class="ghost-btn" type="button" id="copyStoryBtn">复制总览 JSON</button>
+                <button class="ghost-btn" type="button" id="downloadStoryBtn">下载总览 JSON</button>
               </div>
             </div>
           </div>
@@ -286,7 +307,7 @@
                 <p class="eyebrow">Step 3</p>
                 <h3>生成影片 JSON</h3>
               </div>
-              <p class="helper-text">每个 video_0x 会标明主图和参考图；复制对应单个 JSON 去 Higgsfield 生成即可。</p>
+              <p class="helper-text">每个 video_0x 会标明主图、对应剧本和秒数；复制对应单个 JSON，再配对应图片去 Seedance 2.0 生成即可。</p>
               <div class="video-settings">
                 <div class="field-row">
                   <label>
@@ -303,7 +324,7 @@
                     <input id="videoMaxSeconds" type="number" min="5" max="15" step="1" value="15" />
                   </label>
                 </div>
-                <p class="helper-text">Higgsfield 一次最多 15 秒。口播较长时建议选 4-5 段；每个 JSON 会按自然语速估算网页要选几秒。</p>
+                <p class="helper-text">这个数量会同步 Step 2 图片数量。每个 JSON 会按自然语速估算 Seedance 2.0 要生成的秒数。</p>
               </div>
               <div class="json-preview" id="videoPlanPreview"></div>
               <div class="button-row">
@@ -315,7 +336,7 @@
             <div class="tool-panel output-panel">
               <div class="section-heading compact">
                 <p class="eyebrow">Video JSON</p>
-                <h3>2-5 个单独 JSON（每段标明秒数）</h3>
+                <h3>Seedance 2.0 分段 JSON</h3>
               </div>
               <div class="single-json-list" id="singleVideoJsonList"></div>
               <textarea id="videoJsonOutput" class="output-area code-area" rows="26"></textarea>
@@ -339,7 +360,7 @@
                 <input id="clipInput" type="file" accept="video/*" multiple />
                 <label for="clipInput" class="upload-zone">
                   <span class="upload-icon">+</span>
-                  <span>选择 4-5 段短片</span>
+                  <span>选择短片</span>
                   <small>选择后可调整排序，按当前排序合成，输出 WebM</small>
                 </label>
               </div>
@@ -389,6 +410,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=20260706c"></script>
+    <script src="app.js?v=20260706h"></script>
   </body>
 </html>
