@@ -292,6 +292,30 @@ h3 {
   color: var(--accent-dark);
 }
 
+.icon-btn {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.icon-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
+}
+
 .step-panel {
   display: none;
 }
@@ -626,7 +650,7 @@ textarea:focus {
 
 .clip-item {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 10px;
@@ -635,7 +659,7 @@ textarea:focus {
   background: white;
 }
 
-.clip-item span:first-child {
+.clip-order {
   display: grid;
   width: 30px;
   height: 30px;
@@ -644,6 +668,15 @@ textarea:focus {
   background: var(--panel-strong);
   color: var(--accent-dark);
   font-weight: 800;
+}
+
+.clip-meta {
+  min-width: 0;
+}
+
+.clip-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .clip-item strong,

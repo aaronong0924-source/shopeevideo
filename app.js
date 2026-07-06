@@ -1473,16 +1473,32 @@ function renderClipList() {
     .map((file, index) => {
       const sizeMb = (file.size / 1024 / 1024).toFixed(1);
       return `
-        <div class="clip-item">
-          <span>${index + 1}</span>
-          <div>
-            <strong>${file.name}</strong>
+        <div class="clip-item" data-clip-index="${index}">
+          <span class="clip-order">${index + 1}</span>
+          <div class="clip-meta">
+            <strong title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</strong>
             <small>${sizeMb} MB</small>
+          </div>
+          <div class="clip-actions" aria-label="调整短片排序">
+            <button class="icon-btn" type="button" data-action="move-clip-up" data-clip-index="${index}" ${index === 0 ? "disabled" : ""} title="上移">↑</button>
+            <button class="icon-btn" type="button" data-action="move-clip-down" data-clip-index="${index}" ${index === state.clips.length - 1 ? "disabled" : ""} title="下移">↓</button>
           </div>
         </div>
       `;
     })
     .join("");
+}
+
+function moveClip(fromIndex, direction) {
+  const nextIndex = fromIndex + direction;
+  if (fromIndex < 0 || nextIndex < 0 || fromIndex >= state.clips.length || nextIndex >= state.clips.length) {
+    return;
+  }
+  const [clip] = state.clips.splice(fromIndex, 1);
+  state.clips.splice(nextIndex, 0, clip);
+  renderClipList();
+  updateRenderSupport();
+  showToast(`已调整排序：${clip.name}`);
 }
 
 function canRecordCanvas() {
@@ -1495,7 +1511,7 @@ function updateRenderSupport() {
     setProgress(0, "当前浏览器不支持本地录制。请用新版 Chrome/Edge，或先导出合成清单。");
     return false;
   }
-  setProgress(0, state.clips.length ? `已选择 ${state.clips.length} 段短片。` : "准备好后点击合成。");
+  setProgress(0, state.clips.length ? `已选择 ${state.clips.length} 段短片，将按当前排序合成。` : "准备好后点击合成。");
   return true;
 }
 
@@ -1922,6 +1938,11 @@ function handleActionClick(event) {
     const manifest = buildMergeManifest();
     downloadText("merge-manifest.json", JSON.stringify(manifest, null, 2), "application/json");
     showToast("合成清单已导出");
+  }
+  if (action === "move-clip-up" || action === "move-clip-down") {
+    event.preventDefault();
+    const index = Number(button.dataset.clipIndex);
+    moveClip(index, action === "move-clip-up" ? -1 : 1);
   }
   if (action === "copy-single-video-json") {
     event.preventDefault();
