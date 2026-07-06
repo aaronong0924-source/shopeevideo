@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TikTok 爆款短视频生成脑图工具</title>
-    <link rel="stylesheet" href="styles.css?v=20260706a" />
+    <link rel="stylesheet" href="styles.css?v=20260706c" />
   </head>
   <body>
     <div class="app-shell">
@@ -202,6 +202,13 @@
                 <input id="cta" name="cta" type="text" placeholder="例如：点击下面黄色购物车了解更多" />
               </label>
 
+              <label>
+                <span>CTA 快捷选项</span>
+                <select id="ctaPreset">
+                  <option value="">选择一个 CTA，或自己手写</option>
+                </select>
+              </label>
+
               <div class="button-row">
                 <button class="primary-btn" type="button" id="generateScriptBtn">生成流畅脚本</button>
                 <button class="ghost-btn" type="button" data-next="2">下一步</button>
@@ -250,6 +257,7 @@
                 <p class="eyebrow">Step 2</p>
                 <h3>生成 4-5 张制作剧本影片的图</h3>
               </div>
+              <p class="helper-text">每张图卡会标明用途阶段：开场、产品、卖点、信任、CTA。</p>
               <div class="storyboard-grid" id="storyboardCards" aria-live="polite"></div>
               <div class="button-row">
                 <button class="primary-btn" type="button" id="generateStoryBtn">生成图片 JSON</button>
@@ -278,14 +286,15 @@
                 <p class="eyebrow">Step 3</p>
                 <h3>生成影片 JSON</h3>
               </div>
+              <p class="helper-text">每个 video_0x 会标明主图和参考图；复制对应单个 JSON 去 Higgsfield 生成即可。</p>
               <div class="video-settings">
                 <div class="field-row">
                   <label>
                     <span>影片段数</span>
                     <select id="videoClipCount">
-                      <option value="2">2 段（省 token）</option>
-                      <option value="3" selected>3 段（推荐）</option>
-                      <option value="4">4 段</option>
+                      <option value="2">2 段（省 token，口播要更短）</option>
+                      <option value="3">3 段（较省 token）</option>
+                      <option value="4" selected>4 段（推荐，自然口播）</option>
                       <option value="5">5 段（最细）</option>
                     </select>
                   </label>
@@ -294,7 +303,7 @@
                     <input id="videoMaxSeconds" type="number" min="5" max="15" step="1" value="15" />
                   </label>
                 </div>
-                <p class="helper-text">Higgsfield 一次最多 15 秒。这里会把 5 个分镜合并成较少影片段，并在每个 JSON 写清楚网页要选几秒。</p>
+                <p class="helper-text">Higgsfield 一次最多 15 秒。口播较长时建议选 4-5 段；每个 JSON 会按自然语速估算网页要选几秒。</p>
               </div>
               <div class="json-preview" id="videoPlanPreview"></div>
               <div class="button-row">
@@ -345,7 +354,7 @@
                   <input id="maxClipSeconds" type="number" min="2" max="20" step="1" value="5" />
                 </label>
                 <label class="check-control">
-                  <input id="captionToggle" type="checkbox" checked />
+                  <input id="captionToggle" type="checkbox" />
                   <span>加上脚本字幕</span>
                 </label>
               </div>
@@ -380,6 +389,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=20260706a"></script>
+    <script src="app.js?v=20260706c"></script>
   </body>
 </html>

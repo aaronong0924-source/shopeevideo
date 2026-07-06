@@ -107,7 +107,8 @@ function saveDraft() {
     storyJson: $("storyJsonOutput").value,
     videoJsonText: $("videoJsonOutput").value,
     videoSettings: {
-      clipCount: $("videoClipCount")?.value || "3",
+      version: "natural-pacing-v1",
+      clipCount: $("videoClipCount")?.value || "4",
       maxSeconds: $("videoMaxSeconds")?.value || "15"
     },
     characterReference: state.characterReference,
@@ -127,6 +128,7 @@ function loadDraft() {
   const raw = localStorage.getItem(storageKey);
   if (!raw) {
     $("language").value = defaultLanguage;
+    renderCtaPresetOptions();
     drawCanvasPlaceholder();
     updateSummary();
     updateCharacterStatus();
@@ -138,13 +140,14 @@ function loadDraft() {
     state.voiceClone = draft.voiceClone || null;
     state.characterReference = draft.characterReference || null;
     setBrief(draft.brief || {});
+    renderCtaPresetOptions();
     $("scriptOutput").value = draft.script || "";
     $("translatedScriptOutput").value = draft.translatedScript || "";
     $("translationTarget").value = draft.translationTarget || "zh";
     $("storyJsonOutput").value = draft.storyJson || "";
     $("videoJsonOutput").value = draft.videoJsonText || "";
     if (draft.videoSettings) {
-      $("videoClipCount").value = draft.videoSettings.clipCount || "3";
+      $("videoClipCount").value = draft.videoSettings.version ? (draft.videoSettings.clipCount || "4") : "4";
       $("videoMaxSeconds").value = draft.videoSettings.maxSeconds || "15";
     }
     if (draft.storyJson) {
@@ -158,6 +161,7 @@ function loadDraft() {
   } catch (error) {
     localStorage.removeItem(storageKey);
     $("language").value = defaultLanguage;
+    renderCtaPresetOptions();
   }
   drawCanvasPlaceholder();
   updateSummary();
@@ -371,6 +375,44 @@ const translationProfiles = {
   }
 };
 
+const ctaPresetOptions = {
+  zh: [
+    "点击下面黄色购物车了解更多",
+    "现在点击购物车直接下单",
+    "先加入购物车，想试的时候就能下单",
+    "数量有限，卖完就要等下一批",
+    "现在下单，把优惠一起带回家",
+    "点击购物车看看今天还有没有优惠"
+  ],
+  en: [
+    "Tap the yellow cart below to learn more",
+    "Tap the cart now and place your order",
+    "Add it to cart first and try it when you are ready",
+    "Limited stock available, restock may take time",
+    "Order now and grab today's offer",
+    "Tap the cart to check today's deal"
+  ],
+  ms: [
+    "Tekan troli kuning di bawah untuk tengok lagi",
+    "Tekan troli sekarang dan terus order",
+    "Masukkan dalam troli dulu, nanti senang nak cuba",
+    "Stok terhad, habis kena tunggu batch seterusnya",
+    "Order sekarang dan ambil tawaran hari ini",
+    "Tekan troli untuk semak promosi hari ini"
+  ]
+};
+
+function renderCtaPresetOptions() {
+  const select = $("ctaPreset");
+  if (!select) return;
+  const languageCode = getLanguageCode($("language")?.value || defaultLanguage);
+  const options = ctaPresetOptions[languageCode] || ctaPresetOptions.zh;
+  select.innerHTML = [
+    '<option value="">选择一个 CTA，或自己手写</option>',
+    ...options.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)
+  ].join("");
+}
+
 function inferPainForLanguage(brief, target) {
   const text = `${brief.industry} ${brief.audience} ${brief.product}`.toLowerCase();
   if (/猫|宠物|猫砂|pet|cat/.test(text)) {
@@ -428,6 +470,13 @@ function getStoryboardLanguageCopy(target, values) {
     return {
       overlayLanguage: "English",
       titles: ["Pain Point Opening", "Product Reveal", "Benefit Demo", "Trust Proof", "Offer CTA"],
+      usageStages: [
+        "Use in video_01 opening: show the pain point / problem moment.",
+        "Use in product reveal stage: introduce the product clearly.",
+        "Use in benefit demo stage: show the main USP or usage process.",
+        "Use in trust stage: show proof, testimonial feeling, or credibility.",
+        "Use in final CTA stage: show offer/product ending frame."
+      ],
       fallbacks: ["Do you have this problem?", "Product solution", "Main benefit", "People come back for it", "Tap the yellow cart"],
       directions: [
         `${persona} shows the moment ${audience} faces the problem in a realistic everyday scene.`,
@@ -457,6 +506,13 @@ function getStoryboardLanguageCopy(target, values) {
     return {
       overlayLanguage: "Bahasa Melayu",
       titles: ["Buka Masalah", "Produk Muncul", "Demo Kelebihan", "Bukti Kepercayaan", "Tawaran CTA"],
+      usageStages: [
+        "Guna dalam video_01 pembukaan: tunjuk masalah / pain point.",
+        "Guna dalam tahap produk muncul: perkenalkan produk dengan jelas.",
+        "Guna dalam tahap demo kelebihan: tunjuk USP utama atau cara guna.",
+        "Guna dalam tahap kepercayaan: tunjuk rasa testimoni atau kredibiliti.",
+        "Guna dalam tahap CTA akhir: tunjuk offer dan ending frame produk."
+      ],
       fallbacks: ["Masalah ini pernah jadi?", "Solusi produk", "Kelebihan utama", "Pelanggan beli lagi", "Tekan troli kuning"],
       directions: [
         `${persona} tunjuk situasi ${audience} sedang hadapi masalah dalam scene harian yang nampak real.`,
@@ -485,6 +541,13 @@ function getStoryboardLanguageCopy(target, values) {
   return {
     overlayLanguage: "Chinese",
     titles: ["痛点开场", "产品出现", "卖点示范", "信任证明", "优惠 CTA"],
+    usageStages: [
+      "用于 video_01 开场阶段：表现痛点 / 问题发生的一刻。",
+      "用于产品出现阶段：清楚介绍产品。",
+      "用于卖点示范阶段：展示主要 USP 或使用过程。",
+      "用于信任证明阶段：展示见证感、专业感或可信度。",
+      "用于最终 CTA 阶段：展示优惠、产品和结尾画面。"
+    ],
     fallbacks: ["这个问题你也有吗？", "产品解决方案", "卖点示范", "用过的人会回购", "点击黄色购物车"],
     directions: [
       `由${persona}表现${audience}遇到问题的一刻，画面要真实、有生活感。`,
@@ -950,6 +1013,8 @@ function buildStoryboard() {
   scenes.forEach((scene) => {
     scene.language = brief.language || defaultLanguage;
     scene.language_code = storyboardLanguage;
+    scene.usage_stage = languageCopy.usageStages?.[scene.id - 1] || "";
+    scene.video_usage_hint = scene.usage_stage;
     scene.character_mode = characterConfig.mode;
     scene.character_config = {
       mode: characterConfig.mode,
@@ -974,6 +1039,14 @@ function buildStoryboard() {
       prompt_note: characterConfig.prompt_note
     },
     output_rule: languageCopy.outputRules,
+    image_usage_guide: {
+      image_01: languageCopy.usageStages?.[0] || "Opening / pain point image.",
+      image_02: languageCopy.usageStages?.[1] || "Product reveal image.",
+      image_03: languageCopy.usageStages?.[2] || "Benefit demo image.",
+      image_04: languageCopy.usageStages?.[3] || "Trust proof image.",
+      image_05: languageCopy.usageStages?.[4] || "Final CTA image.",
+      next_step_note: "Step 3 will group these image IDs into video_01, video_02, etc. The video JSON preview will show exactly which image to upload for each Higgsfield video."
+    },
     images: scenes
   };
 
@@ -1002,6 +1075,7 @@ function renderStoryboardCards(scenes) {
         </div>
         <div class="scene-body">
           <p><strong>图片：</strong>${scene.image_id || `image_${String(scene.id).padStart(2, "0")}`}</p>
+          <p><strong>用途：</strong>${escapeHtml(scene.usage_stage || "")}</p>
           <p><strong>人物：</strong>${scene.character || "自然口播人物"}</p>
           <p><strong>字幕：</strong>${scene.text_overlay}</p>
           <p><strong>口播：</strong>${scene.spoken_line}</p>
@@ -1060,13 +1134,32 @@ function clampNumber(value, min, max, fallback) {
 
 function getVideoSettings() {
   return {
-    requestedCount: clampNumber($("videoClipCount")?.value, 2, 5, 3),
+    requestedCount: clampNumber($("videoClipCount")?.value, 2, 5, 4),
     maxSeconds: clampNumber($("videoMaxSeconds")?.value, 5, 15, 15)
   };
 }
 
 function getSceneSeconds(scene) {
-  return Math.max(1, Math.ceil(Number(scene.duration_sec) || 5));
+  return Math.max(1, Math.ceil(Number(scene.duration_sec) || 5), estimateNarrationSeconds(scene?.spoken_line || "", scene?.language_code || "zh"));
+}
+
+function estimateNarrationSeconds(text, languageCode = "zh") {
+  const value = cleanText(text);
+  if (!value) return 6;
+
+  const punctuationPauses = (value.match(/[，。！？、,.!?;；:：]/g) || []).length * 0.2;
+  if (languageCode === "en" || languageCode === "ms") {
+    const wordCount = value.split(/\s+/).filter(Boolean).length;
+    return Math.ceil(Math.max(6, wordCount / 2.1 + punctuationPauses + 1.2));
+  }
+
+  const cjkCount = (value.match(/[\u3400-\u9fff]/g) || []).length;
+  const latinWords = (value.replace(/[\u3400-\u9fff]/g, " ").match(/[a-z0-9]+/gi) || []).length;
+  return Math.ceil(Math.max(6, cjkCount / 3.2 + latinWords / 2.1 + punctuationPauses + 1.2));
+}
+
+function buildNoTextOverlayRule() {
+  return "Do not add any visible text, subtitles, captions, scene numbers, video_01 labels, titles, top banners, bottom banners, black text bars, UI labels, watermarks, or progress bars inside the generated video. The frame must stay clean; use voiceover/audio only for spoken content.";
 }
 
 function groupScenesForVideo(scenes, requestedCount, maxSeconds) {
@@ -1123,20 +1216,34 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
   const clipId = `video_${String(index + 1).padStart(2, "0")}`;
   const inputImageIds = group.map((scene) => scene.image_id || `image_${String(scene.id).padStart(2, "0")}`);
   const groupSeconds = group.reduce((sum, scene) => sum + getSceneSeconds(scene), 0);
-  const durationSec = Math.min(maxSeconds, Math.max(5, groupSeconds));
   const sceneTitles = group.map((scene) => scene.title).join(" + ");
+  const narration = group.map((scene) => scene.spoken_line).filter(Boolean).join(" ");
+  const clipLanguageCode = group.find((scene) => scene.language_code)?.language_code || "zh";
+  const narrationSeconds = estimateNarrationSeconds(narration, clipLanguageCode);
+  const durationSec = Math.min(maxSeconds, Math.max(8, groupSeconds, narrationSeconds));
+  const pacingWarning = narrationSeconds > maxSeconds
+    ? `Narration needs about ${narrationSeconds}s for natural pacing, but this clip is capped at ${maxSeconds}s. Shorten/summarize the voiceover or generate more video clips; do not speak faster.`
+    : "Narration should fit at a natural pace. Do not speed up the voiceover.";
   const scenesIncluded = group.map((scene, sceneIndex) => ({
     scene_id: scene.id,
     image_id: inputImageIds[sceneIndex],
     title: scene.title,
-    duration_sec: getSceneSeconds(scene)
+    duration_sec: getSceneSeconds(scene),
+    usage_stage: scene.usage_stage || scene.video_usage_hint || ""
+  }));
+  const imageUsageForVideo = group.map((scene, sceneIndex) => ({
+    image_id: inputImageIds[sceneIndex],
+    role: sceneIndex === 0 ? "main_start_image" : "optional_reference_image",
+    scene_id: scene.id,
+    scene_title: scene.title,
+    usage_stage: scene.usage_stage || scene.video_usage_hint || "",
+    instruction: sceneIndex === 0
+      ? `Upload ${inputImageIds[sceneIndex]} as the main/start image for ${clipId}.`
+      : `If Higgsfield allows extra reference images, add ${inputImageIds[sceneIndex]} as a reference for this same ${clipId}.`
   }));
   const beats = group
     .map((scene, sceneIndex) => `${sceneIndex + 1}. ${inputImageIds[sceneIndex]}: ${scene.visual_direction}`)
     .join(" ");
-  const narration = group.map((scene) => scene.spoken_line).filter(Boolean).join(" ");
-  const captionOverlay = shortOverlay(group.map((scene) => scene.text_overlay).filter(Boolean).join(" / "), sceneTitles);
-  const clipLanguageCode = group.find((scene) => scene.language_code)?.language_code || "zh";
   const timingNote = clipLanguageCode === "en"
     ? `Choose ${durationSec} seconds in Higgsfield web.`
     : clipLanguageCode === "ms"
@@ -1144,6 +1251,7 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
       : `在 Higgsfield 网页选择 ${durationSec} 秒。`;
   const characterConfig = group.find((scene) => scene.character_config)?.character_config || null;
   const characterVideoRule = group.find((scene) => scene.character_video_rule)?.character_video_rule || "";
+  const noTextOverlayRule = buildNoTextOverlayRule();
 
   return {
     scene_ids: group.map((scene) => scene.id),
@@ -1151,6 +1259,8 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     clip_id: clipId,
     input_image_id: inputImageIds[0],
     input_image_ids: inputImageIds,
+    image_usage_for_video: imageUsageForVideo,
+    upload_image_instruction: `For ${clipId}: upload ${inputImageIds[0]} as the main/start image.${inputImageIds.length > 1 ? ` Add ${inputImageIds.slice(1).join(", ")} only as optional reference images if Higgsfield supports multiple references.` : ""}`,
     title: sceneTitles,
     duration_sec: durationSec,
     higgsfield_seconds: durationSec,
@@ -1160,10 +1270,16 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     character_reference: characterConfig?.reference_image || null,
     character_video_rule: characterVideoRule,
     source_image_prompts: group.map((scene) => scene.image_prompt),
-    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference. ${characterVideoRule} This one video contains these beats in order: ${beats} Keep product visibility clear, motion smooth, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
+    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference. ${characterVideoRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, motion smooth, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
     camera_motion: index === 0 ? "slow push-in, then natural handheld movement between beats" : index === totalGroups - 1 ? "gentle handheld movement ending on CTA area" : "small handheld movement with smooth beat-to-beat transitions",
     narration,
-    caption_overlay: captionOverlay,
+    narration_estimated_seconds: narrationSeconds,
+    pacing_note: pacingWarning,
+    caption_overlay: null,
+    on_screen_text: {
+      enabled: false,
+      instruction: noTextOverlayRule
+    },
     sound_design: index === 0 ? "quick attention hit, then clean voiceover" : "light upbeat shop-video background music under voiceover",
     transition_to_next: index === totalGroups - 1 ? "export this as the final CTA clip, then merge later" : "export this clip separately, then merge later"
   };
@@ -1174,7 +1290,8 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
     job_name: clip.clip_id,
     input_image: clip.input_image_id,
     input_images: clip.input_image_ids || [clip.input_image_id],
-    upload_image_note: `Upload/use ${clip.input_image_id} as the main image for this job. If Higgsfield allows extra references, add: ${(clip.input_image_ids || [clip.input_image_id]).join(", ")}.`,
+    image_usage_for_video: clip.image_usage_for_video || [],
+    upload_image_note: clip.upload_image_instruction || `Upload/use ${clip.input_image_id} as the main image for this job. If Higgsfield allows extra references, add: ${(clip.input_image_ids || [clip.input_image_id]).join(", ")}.`,
     output_filename: `${clip.clip_id}.mp4`,
     aspect_ratio: "9:16",
     duration_seconds: clip.duration_sec,
@@ -1192,16 +1309,22 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       mode: voiceConfig.mode,
       language,
       persona,
-      text: clip.narration
+      text: clip.narration,
+      pacing: "natural, conversational, not rushed",
+      pacing_note: clip.pacing_note || "Shorten/summarize the voiceover if needed; never speed-read."
     },
     voice_clone: voiceConfig.mode === "voice_clone" ? voiceConfig : { enabled: false, mode: voiceConfig.mode, instruction: voiceConfig.instruction },
-    caption_overlay: clip.caption_overlay,
+    caption_overlay: null,
+    on_screen_text: clip.on_screen_text || { enabled: false, instruction: buildNoTextOverlayRule() },
     camera_motion: clip.camera_motion,
     sound_design: clip.sound_design,
     rules: [
       `Generate only ${clip.clip_id}.`,
       `Set duration to ${clip.higgsfield_seconds || clip.duration_sec} seconds in Higgsfield web.`,
       `Use ${clip.input_image_id} as the main/start image.`,
+      "Use natural voice pacing. Do not speed up the narration to force it into the clip.",
+      "If narration feels too long, shorten/summarize it while keeping the meaning.",
+      buildNoTextOverlayRule(),
       clip.character_reference ? `Upload the character reference image "${clip.character_reference.name}" if Higgsfield asks for a character/person reference.` : null,
       clip.character_mode === "no_person" ? "No human, no person, no face, no visible hands." : null,
       "Only include the scenes listed in this JSON.",
@@ -1250,10 +1373,11 @@ function buildVideoJson() {
     higgsfield_usage: "不要把这个总览 JSON 整包贴去 Higgsfield。请复制下面 single_video_json_files 里的其中一个单独 JSON，一次只生成一个 video_0x，并按照 higgsfield_seconds 在网页选择秒数。",
     generation_notes: [
       "每个 single_video_json_files 里的 JSON 都是一个独立 Higgsfield 网页任务。",
-      "每个 JSON 都有 higgsfield_seconds；在 Higgsfield 网页就选这个秒数。",
+      "每个 JSON 都有 higgsfield_seconds；在 Higgsfield 网页就选这个秒数。这个秒数已按自然口播速度估算。",
+      "如果口播还是太赶，不要加速讲话；请把影片段数改成 5 段，或缩短该段 voiceover text。",
       "如果一个 video_0x 包含多个 image_id，请用第一个 image_id 做主图；网页支持参考图时再补其他图。",
       "不要把多个 video_0x 的 prompt 放在同一次影片生成里，也不要生成 split-screen 或拼贴影片。",
-      "字幕保持短句，避免挡住产品和人物脸。",
+      "Higgsfield 生成阶段不要加任何画面文字、标题、字幕、video_01、Scene 1/5 或上下黑条。",
       "语气自然，不夸大，不使用绝对保证式表达。"
     ],
     separate_video_prompts: videoClips,
@@ -1271,8 +1395,12 @@ function buildVideoJson() {
     clip_id: clip.clip_id,
     input_image_id: clip.input_image_id,
     input_image_ids: clip.input_image_ids,
+    image_usage_for_video: clip.image_usage_for_video,
+    upload_image_instruction: clip.upload_image_instruction,
     higgsfield_seconds: clip.higgsfield_seconds,
     higgsfield_web_instruction: clip.higgsfield_web_instruction,
+    narration_estimated_seconds: clip.narration_estimated_seconds,
+    pacing_note: clip.pacing_note,
     character_mode: clip.character_mode,
     character_reference: clip.character_reference,
     json: buildSingleVideoJson(videoJson.project_name, videoJson.language, videoJson.persona, videoJson.voice_config, clip)
@@ -1300,12 +1428,33 @@ function renderVideoPlanPreview(plan) {
       (scene) => `
       <div class="plan-row">
         <strong>${scene.clip_id || `${scene.duration_sec}s`} | ${scene.higgsfield_seconds || scene.duration_sec}s</strong>
-        <p>${escapeHtml(scene.title || "")}｜${escapeHtml(scene.higgsfield_web_instruction || "")}｜${escapeHtml(scene.narration || "")}</p>
+        <div>
+          <p><strong>用图：</strong>${formatImageUsage(scene.image_usage_for_video, scene.input_image_ids || [scene.input_image_id])}</p>
+          <p>${escapeHtml(scene.higgsfield_web_instruction || "")}｜${escapeHtml(scene.narration || "")}</p>
+        </div>
       </div>
     `
     )
     .join("");
   renderSingleVideoJsonCards(plan);
+}
+
+function formatImageUsage(imageUsage = [], fallbackImageIds = []) {
+  const usage = Array.isArray(imageUsage) && imageUsage.length
+    ? imageUsage
+    : (fallbackImageIds || []).map((imageId, index) => ({
+        image_id: imageId,
+        role: index === 0 ? "main_start_image" : "optional_reference_image"
+      }));
+
+  return usage
+    .map((item) => {
+      const role = item.role === "main_start_image" ? "主图" : "参考图";
+      const stage = item.usage_stage ? `（${item.usage_stage}）` : "";
+      return `${role} ${item.image_id}${stage}`;
+    })
+    .map(escapeHtml)
+    .join("；");
 }
 
 function getSingleVideoJsonFiles(plan = state.videoJson) {
@@ -1317,6 +1466,8 @@ function getSingleVideoJsonFiles(plan = state.videoJson) {
         ...file,
         input_image_id: file.input_image_id || file.json?.input_image,
         input_image_ids: file.input_image_ids || file.json?.input_images || [file.input_image_id || file.json?.input_image].filter(Boolean),
+        image_usage_for_video: file.image_usage_for_video || file.json?.image_usage_for_video || [],
+        upload_image_instruction: file.upload_image_instruction || file.json?.upload_image_note || "",
         higgsfield_seconds: seconds,
         higgsfield_web_instruction: file.higgsfield_web_instruction || file.json?.higgsfield_web_instruction || (seconds ? `在 Higgsfield 网页选择 ${seconds} 秒。` : "")
       };
@@ -1329,6 +1480,8 @@ function getSingleVideoJsonFiles(plan = state.videoJson) {
     clip_id: clip.clip_id,
     input_image_id: clip.input_image_id,
     input_image_ids: clip.input_image_ids || [clip.input_image_id],
+    image_usage_for_video: clip.image_usage_for_video || [],
+    upload_image_instruction: clip.upload_image_instruction || "",
     higgsfield_seconds: clip.higgsfield_seconds || clip.duration_sec,
     higgsfield_web_instruction: clip.higgsfield_web_instruction || `在 Higgsfield 网页选择 ${clip.duration_sec} 秒。`,
     json: buildSingleVideoJson(
@@ -1359,7 +1512,8 @@ function renderSingleVideoJsonCards(plan) {
           <header>
             <div>
               <strong>${escapeHtml(file.filename)}</strong>
-              <small>${escapeHtml((file.input_image_ids || [file.input_image_id]).join(" + "))} → ${escapeHtml(file.clip_id)} | ${escapeHtml(file.higgsfield_seconds)}s</small>
+              <small>${formatImageUsage(file.image_usage_for_video, file.input_image_ids || [file.input_image_id])} → ${escapeHtml(file.clip_id)} | ${escapeHtml(file.higgsfield_seconds)}s</small>
+              <small>${escapeHtml(file.upload_image_instruction || file.higgsfield_web_instruction || "")}</small>
             </div>
             <div class="button-row">
               <button class="ghost-btn" type="button" data-action="copy-single-video-json" data-clip-id="${escapeHtml(file.clip_id)}">复制</button>
@@ -1586,38 +1740,16 @@ function drawOverlay(ctx, scene, index, total, progress = 0) {
   const width = ctx.canvas.width;
   const height = ctx.canvas.height;
   const pad = 42;
-  const brief = getBrief();
 
+  if (!$("captionToggle").checked) return;
   ctx.save();
-  ctx.fillStyle = "rgba(0, 0, 0, 0.34)";
-  ctx.fillRect(0, 0, width, 170);
+  ctx.fillStyle = "rgba(0, 0, 0, 0.48)";
+  roundedRect(ctx, pad, height - 215, width - pad * 2, 125, 8);
+  ctx.fill();
 
   ctx.fillStyle = "#ffffff";
-  ctx.font = "700 30px Arial, Microsoft YaHei, sans-serif";
-  ctx.fillText(`Scene ${index + 1}/${total}`, pad, 62);
   ctx.font = "800 34px Arial, Microsoft YaHei, sans-serif";
-  wrapText(ctx, brief.product || "TikTok Product Video", pad, 108, width - pad * 2, 40, 2);
-
-  ctx.fillStyle = "rgba(0, 0, 0, 0.58)";
-  roundedRect(ctx, pad, height - 245, width - pad * 2, 155, 8);
-  ctx.fill();
-
-  if ($("captionToggle").checked) {
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "800 37px Arial, Microsoft YaHei, sans-serif";
-    wrapText(ctx, scene?.text_overlay || scene?.caption_overlay || "点击购物车了解更多", pad + 24, height - 188, width - pad * 2 - 48, 46, 2);
-
-    ctx.font = "600 24px Arial, Microsoft YaHei, sans-serif";
-    ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
-    wrapText(ctx, scene?.spoken_line || scene?.narration || "", pad + 24, height - 100, width - pad * 2 - 48, 31, 2);
-  }
-
-  ctx.fillStyle = "rgba(255, 255, 255, 0.24)";
-  roundedRect(ctx, pad, height - 58, width - pad * 2, 7, 4);
-  ctx.fill();
-  ctx.fillStyle = "#f06f4f";
-  roundedRect(ctx, pad, height - 58, (width - pad * 2) * progress, 7, 4);
-  ctx.fill();
+  wrapText(ctx, scene?.spoken_line || scene?.narration || scene?.text_overlay || "", pad + 24, height - 166, width - pad * 2 - 48, 43, 2);
   ctx.restore();
 }
 
@@ -1998,6 +2130,17 @@ function bindEvents() {
 
   $("generateScriptBtn").addEventListener("click", buildScript);
   $("generateAnglesBtn").addEventListener("click", generateAngles);
+  $("ctaPreset").addEventListener("change", () => {
+    if ($("ctaPreset").value) {
+      $("cta").value = $("ctaPreset").value;
+      $("scriptOutput").value = "";
+      $("translatedScriptOutput").value = "";
+      clearGeneratedOutputs();
+      updateSummary();
+      saveDraft();
+      showToast("CTA 已套用，请重新生成脚本");
+    }
+  });
   $("translateScriptBtn").addEventListener("click", buildTranslatedScript);
   $("applyTranslatedScriptBtn").addEventListener("click", applyTranslatedScript);
   $("generateStoryBtn").addEventListener("click", buildStoryboard);
@@ -2036,6 +2179,7 @@ function bindEvents() {
   $("language").addEventListener("change", () => {
     const code = getLanguageCode($("language").value);
     $("translationTarget").value = code;
+    renderCtaPresetOptions();
     if ($("storyJsonOutput").value.trim() || $("videoJsonOutput").value.trim() || state.storyboard.length || state.videoJson) {
       clearGeneratedOutputs();
       showToast("语言已切换，请重新生成图片和影片 JSON");
