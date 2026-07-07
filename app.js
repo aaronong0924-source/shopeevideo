@@ -870,6 +870,138 @@ function applyChatGptAngleJson() {
   showToast("ChatGPT Hook / USP 已套用，请重新生成脚本");
 }
 
+function buildChatGptFullScriptPrompt() {
+  const brief = getBrief();
+  const target = getLanguageCode(brief.language);
+  const languageRules = {
+    zh: "马来西亚华语或中文，口语化、自然、像本地 TikTok Shop 真人口播。不要讲“令吉”，价格直接讲“块”。",
+    en: "English, natural Malaysian TikTok Shop voiceover style, casual, clear, friendly, and voice-safe.",
+    ms: "Bahasa Melayu Malaysia, gaya TikTok Shop tempatan Malaysia. Jangan guna Bahasa Indonesia. Ayat mesti natural, santai, jelas, dan voice-safe."
+  };
+  const currentSuggestions = buildAngleSuggestions(brief, target);
+  const localScriptReference = buildScriptForLanguage(target);
+
+  return [
+    "你是 TikTok Shop 爆款短视频脚本策划和口播导演。",
+    "请根据下面资料，一次生成 Hook、USP 1、USP 2、USP 3，以及完整口播脚本。",
+    "",
+    "要求：",
+    `1. 语言：${languageRules[target] || languageRules.zh}`,
+    "2. 口播要像真人讲话，短句、顺口、有节奏，不要太书面。",
+    "3. Hook 必须 3 秒内能讲完，直接打中痛点或好奇心。",
+    "4. USP 1 是最强卖点，USP 2 是次要卖点，USP 3 是信任卖点。",
+    "5. 完整脚本建议 35-45 秒，按时间段输出，适合后面切成 2-5 个视频片段。",
+    "6. 不要夸大承诺，不要写 100%、保证、永久、治疗、最便宜、马上见效等高风险词。",
+    "7. 如果资料不足，请用合理、保守、可信的表达，不要乱编认证、数据、销量或用户评价。",
+    "8. 只输出 JSON，不要解释，不要 markdown code block。",
+    "",
+    "产品资料：",
+    JSON.stringify(
+      {
+        product: brief.product || "未填写",
+        industry: brief.industry || "未填写",
+        target_audience: brief.audience || "未填写",
+        script_language: brief.language || defaultLanguage,
+        persona: brief.persona || brief.personaPreset || "未填写",
+        character_mode: brief.characterMode || "persona",
+        voice_mode: brief.voiceMode || "ai",
+        offer: brief.offer || "无",
+        cta: brief.cta || "无",
+        current_hook: brief.hook || "",
+        current_usp1: brief.usp1 || "",
+        current_usp2: brief.usp2 || "",
+        current_usp3: brief.usp3 || "",
+        local_angle_reference: currentSuggestions,
+        local_script_reference: localScriptReference
+      },
+      null,
+      2
+    ),
+    "",
+    "请严格按这个格式输出：",
+    JSON.stringify(
+      {
+        hook: "一句 3 秒吸引开场",
+        usp1: "最强卖点，一句话",
+        usp2: "第二卖点，一句话",
+        usp3: "信任卖点，一句话",
+        script_text: "0-3s｜Hook：...\n3-7s｜痛点：...\n7-14s｜产品出现：...\n14-22s｜主要卖点：...\n22-29s｜信任：...\n29-35s｜优惠：...\n35-40s｜CTA：...",
+        script_lines: [
+          { time: "0-3s", label: "Hook", line: "..." },
+          { time: "3-7s", label: "痛点 / Pain / Masalah", line: "..." },
+          { time: "7-14s", label: "产品出现 / Product / Produk", line: "..." },
+          { time: "14-22s", label: "主要卖点 / Benefit / Kelebihan", line: "..." },
+          { time: "22-29s", label: "信任 / Trust / Kepercayaan", line: "..." },
+          { time: "29-35s", label: "优惠 / Offer / Tawaran", line: "..." },
+          { time: "35-40s", label: "CTA", line: "..." }
+        ]
+      },
+      null,
+      2
+    )
+  ].join("\n");
+}
+
+function copyChatGptFullScriptPrompt() {
+  const prompt = buildChatGptFullScriptPrompt();
+  const output = $("fullScriptPromptOutput");
+  if (output) {
+    output.value = prompt;
+  }
+  copyText(prompt, "完整脚本 ChatGPT Prompt 已复制");
+}
+
+function scriptFromChatGptPayload(payload) {
+  if (payload.script_text) {
+    return moneySafe(payload.script_text);
+  }
+  if (Array.isArray(payload.script_lines)) {
+    return payload.script_lines
+      .map((item) => {
+        if (typeof item === "string") return moneySafe(item);
+        const time = cleanText(item.time || "");
+        const label = cleanText(item.label || "");
+        const line = moneySafe(item.line || item.text || "");
+        if (!line) return "";
+        if (time && label) return `${time}｜${label}：${line}`;
+        if (time) return `${time}｜${line}`;
+        if (label) return `${label}：${line}`;
+        return line;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
+}
+
+function applyChatGptFullScriptJson() {
+  const parsed = parseAngleJson($("fullScriptJsonInput")?.value || "");
+  if (!parsed) {
+    showToast("找不到有效脚本 JSON，请检查 ChatGPT 回答");
+    return;
+  }
+
+  const payload = parsed.script ? { ...parsed, ...parsed.script } : parsed;
+  ["hook", "usp1", "usp2", "usp3"].forEach((id) => {
+    if (payload[id]) {
+      $(id).value = safeClaim(payload[id]);
+    }
+  });
+
+  const script = scriptFromChatGptPayload(payload);
+  if (!script) {
+    showToast("JSON 里没有 script_text 或 script_lines");
+    return;
+  }
+
+  $("scriptOutput").value = script;
+  $("translatedScriptOutput").value = "";
+  clearGeneratedOutputs();
+  updateSummary();
+  saveDraft();
+  showToast("ChatGPT Hook / USP / 口播脚本已套用");
+}
+
 function buildScriptForLanguage(target = "zh") {
   const brief = getBrief();
   const profile = translationProfiles[target] || translationProfiles.zh;
@@ -1331,12 +1463,34 @@ function renderStoryboardCards(scenes) {
     .join("");
 }
 
+function buildGeneratorReadyImagePrompt(scene) {
+  const characterLine = scene.character_mode === "no_person"
+    ? "No person in frame; show only the product, real environment, and usage details."
+    : scene.character_reference
+      ? "Use the uploaded character reference as the presenter, same face and identity."
+      : `Use one natural presenter style: ${scene.character || "friendly product presenter"}.`;
+  const productLine = "Product is naturally held or placed on a real table/shelf with visible contact. No floating or mid-air product.";
+
+  return [
+    "Vertical 9:16 realistic product demo photo.",
+    `Scene: ${scene.usage_stage || scene.title || ""}`,
+    `Message: ${scene.script_match_text || scene.spoken_line || ""}`,
+    characterLine,
+    productLine,
+    `Visual: ${scene.visual_direction || ""}`,
+    "Real Malaysian home or shop environment, natural light, clear product visibility, realistic phone photo style.",
+    "No collage, no grid, no split-screen, no subtitles, no scene label, no watermark."
+  ].join(" ");
+}
+
 function buildSingleImageJson(project, scene) {
+  const generatorPrompt = buildGeneratorReadyImagePrompt(scene);
   return {
     filename: `${scene.image_id}.json`,
     image_id: scene.image_id,
     generator: "GPTimg / image generator",
     aspect_ratio: "9:16",
+    copy_this_prompt_to_image_generator: generatorPrompt,
     paired_video_json: `video_${String(scene.id).padStart(2, "0")}.json`,
     seedance_2_0_pairing: `Generate ${scene.image_id} first, then use it together with video_${String(scene.id).padStart(2, "0")}.json in Seedance 2.0.`,
     usage_stage: scene.usage_stage,
@@ -1350,18 +1504,17 @@ function buildSingleImageJson(project, scene) {
     character_config: scene.character_config || null,
     character_reference: scene.character_reference || null,
     visual_direction: scene.visual_direction,
-    prompt: scene.image_prompt,
+    prompt: generatorPrompt,
+    detailed_reference_prompt: scene.image_prompt,
     rules: [
       "Generate only one standalone image for this JSON.",
       `This image must be saved/recognized as ${scene.image_id}.`,
       "Do not combine multiple scenes into one image.",
       "Do not create collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel output.",
       "The visual must match script_match_text exactly and must not jump to another part of the script.",
-      "Keep character_identity_lock main_presenter_01 as the same person across every image JSON.",
       scene.character_reference
         ? `Upload and use the same character reference image "${scene.character_reference.name}" for this image.`
         : "If you need the first and second image to have the exact same person, upload one clear character reference image in Step 1 and use it for every image generation.",
-      "Do not recast the presenter or change face, hairstyle, age, outfit vibe, body shape, or identity between images.",
       "Use this image only with its paired Seedance 2.0 video JSON."
     ],
     project_context: {
@@ -1421,10 +1574,11 @@ function renderSingleImageJsonCards(batch) {
               <small>${escapeHtml(file.image_id)} → ${escapeHtml(file.paired_video_id)} | ${escapeHtml(file.usage_stage)}</small>
               <small>${escapeHtml(file.script_match_text)}</small>
             </div>
-            <div class="button-row">
-              <button class="ghost-btn" type="button" data-action="copy-single-image-json" data-image-id="${escapeHtml(file.image_id)}">复制</button>
-              <button class="ghost-btn" type="button" data-action="download-single-image-json" data-image-id="${escapeHtml(file.image_id)}">下载</button>
-            </div>
+                <div class="button-row">
+                  <button class="ghost-btn" type="button" data-action="copy-single-image-prompt" data-image-id="${escapeHtml(file.image_id)}">复制 Prompt</button>
+                  <button class="ghost-btn" type="button" data-action="copy-single-image-json" data-image-id="${escapeHtml(file.image_id)}">复制</button>
+                  <button class="ghost-btn" type="button" data-action="download-single-image-json" data-image-id="${escapeHtml(file.image_id)}">下载</button>
+                </div>
           </header>
           <textarea readonly>${escapeHtml(jsonText)}</textarea>
         </article>
@@ -2504,6 +2658,14 @@ function handleActionClick(event) {
       copyText(JSON.stringify(file.json, null, 2), `${imageId} JSON 已复制`);
     }
   }
+  if (action === "copy-single-image-prompt") {
+    event.preventDefault();
+    const imageId = button.dataset.imageId;
+    const file = getSingleImageJsonFiles().find((item) => item.image_id === imageId);
+    if (file) {
+      copyText(file.json.copy_this_prompt_to_image_generator || file.json.prompt, `${imageId} Prompt 已复制`);
+    }
+  }
   if (action === "download-single-image-json") {
     event.preventDefault();
     const imageId = button.dataset.imageId;
@@ -2569,6 +2731,8 @@ function bindEvents() {
   $("generateAnglesBtn").addEventListener("click", generateAngles);
   $("copyAnglePromptBtn").addEventListener("click", copyChatGptAnglePrompt);
   $("applyAngleJsonBtn").addEventListener("click", applyChatGptAngleJson);
+  $("copyFullScriptPromptBtn").addEventListener("click", copyChatGptFullScriptPrompt);
+  $("applyFullScriptJsonBtn").addEventListener("click", applyChatGptFullScriptJson);
   $("ctaPreset").addEventListener("change", () => {
     if ($("ctaPreset").value) {
       $("cta").value = $("ctaPreset").value;
