@@ -1144,24 +1144,30 @@ function buildCharacterConfig(brief) {
     const reference = state.characterReference || null;
     const referenceName = reference?.name || "uploaded_character_reference_image";
     const persona = safeClaim(brief.persona || "上传参考图里的本人，自然亲切地介绍产品");
+    const consistencyInstruction = `Character consistency lock: main_presenter_01. Upload and use the same character reference image "${referenceName}" for every image_0x and video_0x. Keep the exact same face, hairstyle, age, body shape, outfit vibe, skin tone, and natural expression style across all scenes. Do not recast, beautify into another person, change age, change hairstyle, or change identity.`;
     return {
       mode,
       label: "上传自己做人设参考",
       persona,
       reference,
-      prompt_note: `Use the uploaded character reference image "${referenceName}" as the same person across all images. Keep face, hairstyle, age, body shape, outfit vibe, and natural expression consistent. Do not turn the person into a different model.`,
-      video_note: `Use the same uploaded character reference "${referenceName}" for this video. Keep the person consistent with the image prompt and avoid changing face or identity.`
+      identity_lock: "main_presenter_01",
+      consistency_instruction: consistencyInstruction,
+      prompt_note: consistencyInstruction,
+      video_note: `Use the same uploaded character reference "${referenceName}" for this video. Keep main_presenter_01 consistent with the image prompt and avoid changing face, hairstyle, age, outfit vibe, or identity.`
     };
   }
 
   const persona = safeClaim(brief.persona || "自然口播人物");
+  const consistencyInstruction = `Character consistency lock: main_presenter_01. Use the same recurring on-screen person in every image_0x and video_0x: ${persona}. Keep the same apparent age, gender presentation, face shape, hairstyle, hair color, skin tone, body shape, outfit style, and expression style across all scenes. Do not recast the person, do not change into a different model, and do not vary the face between images. For best consistency, upload one clear character reference image and switch 人物来源 to 上传自己做人设参考.`;
   return {
     mode: "persona",
     label: "预设 / 手写人物",
     persona,
     reference: null,
-    prompt_note: `Use this character/persona consistently: ${persona}.`,
-    video_note: `Keep the on-screen character consistent with this persona: ${persona}.`
+    identity_lock: "main_presenter_01",
+    consistency_instruction: consistencyInstruction,
+    prompt_note: consistencyInstruction,
+    video_note: `Keep the on-screen character as main_presenter_01, matching the same persona and visual identity from the image prompt: ${persona}.`
   };
 }
 
@@ -1197,10 +1203,9 @@ function buildStoryboard() {
   const languageCopy = getStoryboardLanguageCopy(storyboardLanguage, { product, audience, persona, usp1, usp2, usp3, cta });
 
   const standaloneImageRule = "Generate ONE standalone vertical 9:16 image for this image_id only. Do not create a collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel image. Do not include any other scene in this output.";
-  const baseNegative = "no fake brand logo, no tiny unreadable text, no exaggerated medical or guaranteed claims, no distorted hands, no extra fingers, no collage, no grid, no storyboard sheet, no split screen, no multi panel";
-  const characterPromptNote = characterConfig.mode === "persona"
-    ? `Use this character/persona consistently: ${persona}.`
-    : characterConfig.prompt_note;
+  const productGroundingRule = "The product must be physically grounded: held naturally by the person or placed on a real table/shelf/floor with visible contact. Do not show the product floating, flying, falling from the sky, or appearing mid-air.";
+  const baseNegative = "no fake brand logo, no tiny unreadable text, no exaggerated medical or guaranteed claims, no distorted hands, no extra fingers, no floating product, no flying product, no mid-air product, no collage, no grid, no storyboard sheet, no split screen, no multi panel";
+  const characterPromptNote = characterConfig.prompt_note;
 
   const scenes = Array.from({ length: desiredImageCount }, (_, index) => {
     const sceneNumber = index + 1;
@@ -1227,7 +1232,7 @@ function buildStoryboard() {
       spoken_line: matchedScript,
       text_overlay: shortOverlay(matchedScript, stage.fallback),
       visual_direction: visualDirection,
-      image_prompt: `${standaloneImageRule} ${scriptMatchRule(index)} ${characterPromptNote} Vertical 9:16 Seedance 2.0 image-to-video keyframe, ${place}, ${stagePrompt}, ${visualDirection}, ${product} visible when relevant, realistic Malaysian TikTok Shop commercial style, natural light, authentic handheld framing, high detail, ${baseNegative}`
+      image_prompt: `${standaloneImageRule} ${scriptMatchRule(index)} ${characterPromptNote} ${productGroundingRule} Vertical 9:16 Seedance 2.0 image-to-video keyframe, ${place}, ${stagePrompt}, ${visualDirection}, ${product} visible when relevant, realistic Malaysian TikTok Shop commercial style, natural light, authentic handheld framing, high detail, ${baseNegative}`
     };
   });
 
@@ -1242,6 +1247,8 @@ function buildStoryboard() {
       label: characterConfig.label,
       persona,
       reference_image: characterConfig.reference,
+      identity_lock: characterConfig.identity_lock || null,
+      consistency_instruction: characterConfig.consistency_instruction || characterConfig.prompt_note,
       prompt_note: characterConfig.prompt_note,
       video_note: characterConfig.video_note
     };
@@ -1267,8 +1274,17 @@ function buildStoryboard() {
       label: characterConfig.label,
       persona,
       reference_image: characterConfig.reference,
+      identity_lock: characterConfig.identity_lock || null,
+      consistency_instruction: characterConfig.consistency_instruction || characterConfig.prompt_note,
       prompt_note: characterConfig.prompt_note
     },
+    character_consistency_rules: [
+      characterConfig.mode === "self_upload"
+        ? "For every image JSON, upload the same character reference image before generating. This is the most reliable way to keep the same person."
+        : "Without an uploaded character reference, GPTimg / image generators may still vary the face. For best results, upload one clear character reference image and select 上传自己做人设参考.",
+      "Keep identity_lock main_presenter_01 unchanged across all image_0x and video_0x files.",
+      "Do not let each scene invent a new presenter, model, face, hairstyle, age, or outfit style."
+    ],
     output_rule: buildImageOutputRules(storyboardLanguage, desiredImageCount),
     image_usage_guide: Object.fromEntries([
       ...scenes.map((scene) => [scene.image_id, scene.usage_stage]),
@@ -1329,6 +1345,9 @@ function buildSingleImageJson(project, scene) {
     script_match_text: scene.script_match_text || scene.spoken_line || "",
     character: scene.character,
     character_mode: scene.character_mode,
+    character_identity_lock: scene.character_config?.identity_lock || "main_presenter_01",
+    character_consistency_instruction: scene.character_config?.consistency_instruction || scene.character_config?.prompt_note || "",
+    character_config: scene.character_config || null,
     character_reference: scene.character_reference || null,
     visual_direction: scene.visual_direction,
     prompt: scene.image_prompt,
@@ -1338,6 +1357,11 @@ function buildSingleImageJson(project, scene) {
       "Do not combine multiple scenes into one image.",
       "Do not create collage, grid, storyboard sheet, contact sheet, split-screen, or multi-panel output.",
       "The visual must match script_match_text exactly and must not jump to another part of the script.",
+      "Keep character_identity_lock main_presenter_01 as the same person across every image JSON.",
+      scene.character_reference
+        ? `Upload and use the same character reference image "${scene.character_reference.name}" for this image.`
+        : "If you need the first and second image to have the exact same person, upload one clear character reference image in Step 1 and use it for every image generation.",
+      "Do not recast the presenter or change face, hairstyle, age, outfit vibe, body shape, or identity between images.",
       "Use this image only with its paired Seedance 2.0 video JSON."
     ],
     project_context: {
@@ -1556,7 +1580,25 @@ function groupScenesForVideo(scenes, requestedCount, maxSeconds) {
   return groups.filter((group) => group.length);
 }
 
-function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
+function buildRealisticProductMotionRule(characterMode = "persona") {
+  const handling = characterMode === "no_person"
+    ? "The product must already be placed on a real surface at the start of the shot. If it moves, movement must come only from realistic camera motion or real-world handling implied by the scene."
+    : "The product must already be in the person's hand or resting on a real table/shelf at the start of the shot. If the person picks it up, show only a normal hand pickup from the surface.";
+
+  return `${handling} Strictly no flying product, no floating product, no product dropping from the sky, no teleporting, no magical reveal, no object sliding by itself, no sudden pop-in, no spinning product animation, and no unrealistic VFX. Keep gravity and physical contact realistic. Use small natural handheld camera movement only; avoid dramatic transitions that move the product unnaturally.`;
+}
+
+function buildNaturalLipSyncRule(characterMode = "persona", voiceMode = "ai_voice") {
+  if (characterMode === "no_person") {
+    return "No presenter lip-sync is needed because this is a no-person clip. Do not generate a talking face, mouth, lips, or visible human head.";
+  }
+  if (voiceMode === "no_voiceover") {
+    return "No spoken voiceover is used. Keep the presenter silent with natural breathing or a soft smile only; do not animate speaking mouth movement.";
+  }
+  return "Natural speaking lip-sync required: when the voiceover is talking, the presenter's lips, jaw, and subtle facial muscles must move naturally in sync with the narration. Avoid a frozen closed mouth, mismatched mouth shapes, exaggerated lip flapping, robotic talking, distorted teeth, distorted tongue, or unnatural facial warping. Keep expression friendly and realistic, like a normal TikTok Shop presenter speaking to camera.";
+}
+
+function buildGroupedVideoClip(group, index, totalGroups, maxSeconds, voiceConfig = null) {
   const clipId = `video_${String(index + 1).padStart(2, "0")}`;
   const inputImageIds = group.map((scene) => scene.image_id || `image_${String(scene.id).padStart(2, "0")}`);
   const groupSeconds = group.reduce((sum, scene) => sum + getSceneSeconds(scene), 0);
@@ -1600,6 +1642,8 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
   const characterVideoRule = group.find((scene) => scene.character_video_rule)?.character_video_rule || "";
   const noTextOverlayRule = buildNoTextOverlayRule();
   const voiceAccentInstruction = getVoiceAccentInstruction(clipLanguageCode);
+  const realisticMotionRule = buildRealisticProductMotionRule(characterConfig?.mode || "persona");
+  const lipSyncRule = buildNaturalLipSyncRule(characterConfig?.mode || "persona", voiceConfig?.mode || "ai_voice");
 
   return {
     scene_ids: group.map((scene) => scene.id),
@@ -1619,9 +1663,11 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds) {
     character_config: characterConfig,
     character_reference: characterConfig?.reference_image || null,
     character_video_rule: characterVideoRule,
+    realistic_product_motion_rule: realisticMotionRule,
+    natural_lip_sync_rule: lipSyncRule,
     source_image_prompts: group.map((scene) => scene.image_prompt),
-    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference. ${characterVideoRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, motion smooth, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Voice instruction: ${voiceAccentInstruction} Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
-    camera_motion: index === 0 ? "slow push-in, then natural handheld movement between beats" : index === totalGroups - 1 ? "gentle handheld movement ending on CTA area" : "small handheld movement with smooth beat-to-beat transitions",
+    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference and preserve the product position from the start image. ${characterVideoRule} ${realisticMotionRule} ${lipSyncRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, movement subtle and physically realistic, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Voice instruction: ${voiceAccentInstruction} Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
+    camera_motion: index === 0 ? "subtle slow push-in only; keep product physically stable" : index === totalGroups - 1 ? "gentle handheld movement ending on CTA area; no object flying or pop-in" : "small handheld movement with smooth realistic transitions; keep objects grounded",
     narration,
     voice_accent_instruction: voiceAccentInstruction,
     narration_estimated_seconds: narrationSeconds,
@@ -1659,6 +1705,8 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       instruction: clip.character_video_rule || ""
     },
     prompt: clip.video_prompt,
+    realistic_product_motion_rule: clip.realistic_product_motion_rule || buildRealisticProductMotionRule(clip.character_mode || "persona"),
+    natural_lip_sync_rule: clip.natural_lip_sync_rule || buildNaturalLipSyncRule(clip.character_mode || "persona", voiceConfig.mode),
     voiceover: {
       mode: voiceConfig.mode,
       language,
@@ -1680,6 +1728,8 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       clip.voice_accent_instruction || getVoiceAccentInstruction(getLanguageCode(language), language),
       "Use natural voice pacing. Do not speed up the narration to force it into the clip.",
       "If narration feels too long, shorten/summarize it while keeping the meaning.",
+      clip.realistic_product_motion_rule || buildRealisticProductMotionRule(clip.character_mode || "persona"),
+      clip.natural_lip_sync_rule || buildNaturalLipSyncRule(clip.character_mode || "persona", voiceConfig.mode),
       buildNoTextOverlayRule(),
       clip.character_reference ? `Upload the character reference image "${clip.character_reference.name}" if Higgsfield asks for a character/person reference.` : null,
       clip.character_mode === "no_person" ? "No human, no person, no face, no visible hands." : null,
@@ -1708,7 +1758,7 @@ function buildVideoJson() {
   const persona = safeClaim(brief.persona || "自然口播人物");
   const voiceConfig = buildVoiceConfig(brief);
   const groups = groupScenesForVideo(scenes, requestedCount, maxSeconds);
-  const videoClips = groups.map((group, index) => buildGroupedVideoClip(group, index, groups.length, maxSeconds));
+  const videoClips = groups.map((group, index) => buildGroupedVideoClip(group, index, groups.length, maxSeconds, voiceConfig));
   const totalDuration = videoClips.reduce((sum, clip) => sum + Number(clip.duration_sec || 0), 0);
   const visualCharacterConfig = scenes.find((scene) => scene.character_config)?.character_config || buildCharacterConfig(brief);
   const voiceStyle = voiceConfig.accent_instruction || brief.language || translationProfiles[videoLanguageCode]?.languageInstruction || "马来西亚华语，口语化，自然，有信任感，不念“令吉”，价格直接说“块”";
@@ -1736,6 +1786,8 @@ function buildVideoJson() {
       "如果口播还是太赶，不要加速讲话；请把影片段数改成 5 段，或缩短该段 voiceover text。",
       "如果一个 video_0x 包含多个 image_id，请用第一个 image_id 做主图；网页支持参考图时再补其他图。",
       "不要把多个 video_0x 的 prompt 放在同一次影片生成里，也不要生成 split-screen 或拼贴影片。",
+      "产品必须从主图原本的位置开始，只能自然拿起或保持在桌面/手上；不要让产品从空中飞入、悬浮、瞬移、自己滑动或突然出现。",
+      "有口播和人物出镜时，嘴巴、下巴和轻微表情必须跟旁白自然同步；不要闭嘴播音、嘴型对不上、夸张张嘴或脸部扭曲。",
       "Higgsfield 生成阶段不要加任何画面文字、标题、字幕、video_01、Scene 1/5 或上下黑条。",
       "语气自然，不夸大，不使用绝对保证式表达。"
     ],
