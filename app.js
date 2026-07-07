@@ -1752,6 +1752,25 @@ function buildNaturalLipSyncRule(characterMode = "persona", voiceMode = "ai_voic
   return "Natural speaking lip-sync required: when the voiceover is talking, the presenter's lips, jaw, and subtle facial muscles must move naturally in sync with the narration. Avoid a frozen closed mouth, mismatched mouth shapes, exaggerated lip flapping, robotic talking, distorted teeth, distorted tongue, or unnatural facial warping. Keep expression friendly and realistic, like a normal TikTok Shop presenter speaking to camera.";
 }
 
+function buildClipNarrationRule(clipId, narration) {
+  const text = moneySafe(narration || "");
+  return `Voiceover for ${clipId} ONLY: "${text}". Use exactly this narration meaning for this video segment. Do not repeat video_01 narration, do not use another clip's voiceover, and do not replace this with the previous video script.`;
+}
+
+function buildClipContinuationRule(index, totalGroups) {
+  const part = index + 1;
+  if (totalGroups <= 1) {
+    return "This is the full short video in one segment.";
+  }
+  if (index === 0) {
+    return `This is part ${part} of ${totalGroups}: start the ad with the opening/hook only. Export this as a separate file, but it will be merged with the next parts later.`;
+  }
+  if (index === totalGroups - 1) {
+    return `This is part ${part} of ${totalGroups}: continue after the previous clip and finish the ad. Do not restart the hook, do not repeat earlier narration, and do not act like this is a new ad.`;
+  }
+  return `This is part ${part} of ${totalGroups}: continue the ad after the previous clip. Do not restart the hook, do not repeat earlier narration, and do not act like this is a new ad.`;
+}
+
 function buildGroupedVideoClip(group, index, totalGroups, maxSeconds, voiceConfig = null) {
   const clipId = `video_${String(index + 1).padStart(2, "0")}`;
   const inputImageIds = group.map((scene) => scene.image_id || `image_${String(scene.id).padStart(2, "0")}`);
@@ -1798,6 +1817,8 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds, voiceConfi
   const voiceAccentInstruction = getVoiceAccentInstruction(clipLanguageCode);
   const realisticMotionRule = buildRealisticProductMotionRule(characterConfig?.mode || "persona");
   const lipSyncRule = buildNaturalLipSyncRule(characterConfig?.mode || "persona", voiceConfig?.mode || "ai_voice");
+  const narrationRule = buildClipNarrationRule(clipId, narration);
+  const continuationRule = buildClipContinuationRule(index, totalGroups);
 
   return {
     scene_ids: group.map((scene) => scene.id),
@@ -1810,7 +1831,10 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds, voiceConfi
     title: sceneTitles,
     duration_sec: durationSec,
     seedance_seconds: durationSec,
-    seedance_2_0_instruction: `Use ${inputImageIds[0]} with ${clipId}.json in Seedance 2.0. Generate one standalone ${durationSec}-second vertical 9:16 video segment.`,
+    sequence_part: index + 1,
+    sequence_total_parts: totalGroups,
+    continuation_rule: continuationRule,
+    seedance_2_0_instruction: `Use ${inputImageIds[0]} with ${clipId}.json in Seedance 2.0. Generate part ${index + 1} of ${totalGroups} as a separate ${durationSec}-second vertical 9:16 export segment. The content must continue the same ad sequence, not restart it.`,
     higgsfield_seconds: durationSec,
     higgsfield_web_instruction: timingNote,
     character_mode: characterConfig?.mode || "persona",
@@ -1819,8 +1843,9 @@ function buildGroupedVideoClip(group, index, totalGroups, maxSeconds, voiceConfi
     character_video_rule: characterVideoRule,
     realistic_product_motion_rule: realisticMotionRule,
     natural_lip_sync_rule: lipSyncRule,
+    clip_narration_rule: narrationRule,
     source_image_prompts: group.map((scene) => scene.image_prompt),
-    video_prompt: `Generate ${clipId} as ONE standalone ${durationSec}-second vertical 9:16 video. ${timingNote} Use ${inputImageIds[0]} as the main/start image reference and preserve the product position from the start image. ${characterVideoRule} ${realisticMotionRule} ${lipSyncRule} This one video contains these visual beats in order: ${beats} Keep product visibility clear, movement subtle and physically realistic, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Voice instruction: ${voiceAccentInstruction} Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include content from other video JSON files. Do not merge with other clips. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
+    video_prompt: `Generate ${clipId} as ONE separate export segment, part ${index + 1} of ${totalGroups}, duration ${durationSec} seconds, vertical 9:16. ${timingNote} ${continuationRule} Use ${inputImageIds[0]} as the main/start image reference and preserve the product position from the start image. ${narrationRule} ${characterVideoRule} ${realisticMotionRule} ${lipSyncRule} This segment contains these visual beats in order: ${beats} Keep product visibility clear, movement subtle and physically realistic, pacing natural for Malaysian TikTok Shop, realistic lighting, no overacting. Voice instruction: ${voiceAccentInstruction} Use natural voice pacing; if the narration cannot fit naturally, shorten/summarize the voiceover instead of speaking faster. ${noTextOverlayRule} Do not include narration or content from other video JSON files. Do not merge clips inside Seedance; export only this one part, then merge parts later in order. Do not create split-screen, collage, grid, storyboard sheet, or multi-panel video.`,
     camera_motion: index === 0 ? "subtle slow push-in only; keep product physically stable" : index === totalGroups - 1 ? "gentle handheld movement ending on CTA area; no object flying or pop-in" : "small handheld movement with smooth realistic transitions; keep objects grounded",
     narration,
     voice_accent_instruction: voiceAccentInstruction,
@@ -1843,7 +1868,10 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
     input_image: clip.input_image_id,
     input_images: clip.input_image_ids || [clip.input_image_id],
     image_usage_for_video: clip.image_usage_for_video || [],
-    seedance_2_0_instruction: `Use ${clip.input_image_id} together with this JSON to generate ${clip.clip_id}. Set duration around ${clip.higgsfield_seconds || clip.duration_sec} seconds. Keep the output as one standalone vertical 9:16 video segment.`,
+    sequence_part: clip.sequence_part || null,
+    sequence_total_parts: clip.sequence_total_parts || null,
+    continuation_rule: clip.continuation_rule || "",
+    seedance_2_0_instruction: `Use ${clip.input_image_id} together with this JSON to generate ${clip.clip_id}. Set duration around ${clip.higgsfield_seconds || clip.duration_sec} seconds. Export it as part ${clip.sequence_part || ""} of ${clip.sequence_total_parts || ""} in the same ad sequence; it must continue the script flow, not restart the ad.`,
     upload_image_note: clip.upload_image_instruction || `Upload/use ${clip.input_image_id} as the main image for this job. If Higgsfield allows extra references, add: ${(clip.input_image_ids || [clip.input_image_id]).join(", ")}.`,
     output_filename: `${clip.clip_id}.mp4`,
     aspect_ratio: "9:16",
@@ -1859,6 +1887,8 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
       instruction: clip.character_video_rule || ""
     },
     prompt: clip.video_prompt,
+    voiceover_text_for_this_video_only: clip.narration,
+    clip_narration_rule: clip.clip_narration_rule || buildClipNarrationRule(clip.clip_id, clip.narration),
     realistic_product_motion_rule: clip.realistic_product_motion_rule || buildRealisticProductMotionRule(clip.character_mode || "persona"),
     natural_lip_sync_rule: clip.natural_lip_sync_rule || buildNaturalLipSyncRule(clip.character_mode || "persona", voiceConfig.mode),
     voiceover: {
@@ -1877,8 +1907,10 @@ function buildSingleVideoJson(projectName, language, persona, voiceConfig, clip)
     sound_design: clip.sound_design,
     rules: [
       `Generate only ${clip.clip_id}.`,
+      clip.continuation_rule || "",
       `Set duration to ${clip.higgsfield_seconds || clip.duration_sec} seconds in Higgsfield web.`,
       `Use ${clip.input_image_id} as the main/start image.`,
+      clip.clip_narration_rule || buildClipNarrationRule(clip.clip_id, clip.narration),
       clip.voice_accent_instruction || getVoiceAccentInstruction(getLanguageCode(language), language),
       "Use natural voice pacing. Do not speed up the narration to force it into the clip.",
       "If narration feels too long, shorten/summarize it while keeping the meaning.",
@@ -1929,13 +1961,15 @@ function buildVideoJson() {
     persona,
     visual_character_config: visualCharacterConfig,
     voice_config: voiceConfig,
-    task: `分别生成 ${videoClips.length} 个短片，每个短片最多 ${maxSeconds} 秒。不要一次生成一条完整影片。生成 video_01 到 video_${String(videoClips.length).padStart(2, "0")} 后，再回到本工具第四步合成。`,
+    task: `因为 Seedance 2.0 每次最多 ${maxSeconds} 秒，所以把同一支广告连续分成 ${videoClips.length} 个短片。video_02 必须接着 video_01 的内容继续，不能重新开场。生成 video_01 到 video_${String(videoClips.length).padStart(2, "0")} 后，再回到本工具第四步按顺序合成。`,
     seedance_2_0_usage: "不要把总览 JSON、全部图片一次丢进 Seedance。请复制 single_video_json_files 里的一个单独 JSON，并搭配对应的 image_0x，一次只生成一个 video_0x。",
     higgsfield_usage: "如果还使用 Higgsfield，也请一次只复制一个 single_video_json，并按照 higgsfield_seconds 在网页选择秒数。",
     generation_notes: [
       "Seedance 2.0 用法：每个 video_0x 只配对应的 image_0x 和该段 JSON，不要把全部图片和全部 JSON 一次丢进去。",
       ...(videoLanguageCode === "ms" ? ["如果使用 Bahasa Melayu，声音必须是 Bahasa Melayu Malaysia / Malaysian Malay，本地马来西亚口音；不要印尼腔、不要 Bahasa Indonesia、不要太正式的新闻播报腔。"] : []),
-      "每个 single_video_json_files 里的 JSON 都是一个独立 Seedance 2.0 图生视频任务。",
+      "每个 single_video_json_files 里的 JSON 都是一个独立 Seedance 2.0 图生视频任务，但内容是同一支广告的连续分段。",
+      "video_02、video_03、video_04 要接着上一段继续，不要重新讲 Hook，不要重复 video_01 的口播。",
+      "每个 video_0x 都有自己的 voiceover_text_for_this_video_only；生成时只用该段口播，不要沿用 video_01 的口播。",
       "每个 JSON 都有 higgsfield_seconds；在 Higgsfield 网页就选这个秒数。这个秒数已按自然口播速度估算。",
       "如果口播还是太赶，不要加速讲话；请把影片段数改成 5 段，或缩短该段 voiceover text。",
       "如果一个 video_0x 包含多个 image_id，请用第一个 image_id 做主图；网页支持参考图时再补其他图。",
@@ -1965,6 +1999,9 @@ function buildVideoJson() {
     upload_image_instruction: clip.upload_image_instruction,
     seedance_2_0_pairing: `Use this JSON with ${clip.input_image_id}.`,
     seedance_2_0_instruction: clip.seedance_2_0_instruction,
+    sequence_part: clip.sequence_part,
+    sequence_total_parts: clip.sequence_total_parts,
+    continuation_rule: clip.continuation_rule,
     higgsfield_seconds: clip.higgsfield_seconds,
     seedance_seconds: clip.higgsfield_seconds,
     higgsfield_web_instruction: clip.higgsfield_web_instruction,
@@ -2084,7 +2121,8 @@ function renderSingleVideoJsonCards(plan) {
           <header>
             <div>
               <strong>${escapeHtml(file.filename)}</strong>
-              <small>${formatImageUsage(file.image_usage_for_video, file.input_image_ids || [file.input_image_id])} → ${escapeHtml(file.clip_id)} | ${escapeHtml(file.higgsfield_seconds)}s</small>
+              <small>Part ${escapeHtml(file.json?.sequence_part || file.sequence_part || "")}/${escapeHtml(file.json?.sequence_total_parts || file.sequence_total_parts || "")} | ${formatImageUsage(file.image_usage_for_video, file.input_image_ids || [file.input_image_id])} → ${escapeHtml(file.clip_id)} | ${escapeHtml(file.higgsfield_seconds)}s</small>
+              <small>本段口播：${escapeHtml(file.json?.voiceover_text_for_this_video_only || file.json?.voiceover?.text || "")}</small>
               <small>${escapeHtml(file.seedance_2_0_pairing || file.upload_image_instruction || file.higgsfield_web_instruction || "")}</small>
             </div>
             <div class="button-row">
